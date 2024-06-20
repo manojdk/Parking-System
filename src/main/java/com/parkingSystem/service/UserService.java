@@ -77,6 +77,30 @@ public class UserService {
 		}
 	}
 
+	public User updateUser(Long userId, String userName, String userEmail, String password, String licensePlate) {
+		try {
+			Optional<User> userOptional = userRepository.findByUserId(userId);
+
+			if (userOptional.isEmpty()) {
+				throw new IllegalArgumentException("User not found with ID: " + userId);
+			}
+
+			User user = userOptional.get();
+			if (userName != null)
+				user.setUserName(userName);
+			if (userEmail != null)
+				user.setUserEmail(userEmail);
+			if (password != null)
+				user.setPassword(password);
+			if (licensePlate != null)
+				user.setLicencePlate(licensePlate);
+
+			return userRepository.save(user);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while updating user: " + e.getMessage());
+		}
+	}
+
 	public Optional<User> getUserById(Long userId) {
 		try {
 			return userRepository.findByUserId(userId);

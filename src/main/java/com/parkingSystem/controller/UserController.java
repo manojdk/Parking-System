@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -57,6 +58,31 @@ public class UserController {
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error retrieving user details: " + e.getMessage());
+		}
+	}
+
+	@PutMapping("/update")
+	public ResponseEntity<Object> updateUser(@RequestBody Map<String, String> request) {
+		try {
+			Long userId = Long.parseLong(request.get("userId"));
+			String userName = request.get("userName");
+			String userEmail = request.get("userEmail");
+			String password = request.get("password");
+			String licensePlate = request.get("licensePlate");
+
+			User updatedUser = userService.updateUser(userId, userName, userEmail, password, licensePlate);
+
+			Map<String, Object> response = new HashMap<>();
+			response.put("status", "success");
+			response.put("message", "User updated successful");
+			response.put("userId", updatedUser.getUserId());
+
+			return ResponseEntity.ok(response);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error updating user: " + e.getMessage());
 		}
 	}
 }

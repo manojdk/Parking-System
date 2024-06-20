@@ -14,7 +14,7 @@ import lombok.Data;
 public class ParkingSpace {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@GeneratedValue(strategy = GenerationType.UUID)
 	@Column(name = "parking_space_id")
 	private Long parkingSpaceId;
 
