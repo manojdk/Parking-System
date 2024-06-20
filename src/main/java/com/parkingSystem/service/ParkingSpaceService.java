@@ -37,7 +37,7 @@ public class ParkingSpaceService {
 
 	public Optional<ParkingSpace> getParkingSpaceById(long parkingSpaceId) {
 		try {
-			return parkingSpaceRepository.findById(parkingSpaceId);
+			return parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching parking spaces by ID: " + e.getMessage());
@@ -65,7 +65,7 @@ public class ParkingSpaceService {
 	@Transactional
 	public void deleteParkingSpace(Long parkingSpaceId) {
 		try {
-			parkingSpaceRepository.deleteById(parkingSpaceId);
+			parkingSpaceRepository.deleteByParkingSpaceId(parkingSpaceId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while deleting the parking space: " + e.getMessage());
 		}

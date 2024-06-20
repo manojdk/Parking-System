@@ -2,7 +2,6 @@ package com.parkingSystem.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -59,8 +58,8 @@ public class ReservationService {
 	@Transactional
 	public void cancelReservation(Long reservationId) {
 		try {
-			Reservation reservation = reservationRepository.findById(reservationId)
-					.orElseThrow(() -> new IllegalArgumentException("Reservation not found."));
+			Reservation reservation = reservationRepository.findByReservationId(reservationId);
+
 			// Mark parking space as available
 			ParkingSpace parkingSpace = reservation.getParkingSpace();
 			parkingSpace.setAvailabilityStatus(true);
@@ -75,17 +74,17 @@ public class ReservationService {
 		}
 	}
 
-	public Optional<Reservation> getReservationById(Long reservationId) {
+	public Reservation getReservationById(Long reservationId) {
 		try {
-			return reservationRepository.findById(reservationId);
+			return reservationRepository.findByReservationId(reservationId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while fetching reservation by ID: " + e.getMessage());
 		}
 	}
 
-	public List<Reservation> getReservationsByUserId(Long userId) {
+	public List<Reservation> getReservationsByUserId(User userId) {
 		try {
-			return reservationRepository.findAllByUserId(userId);
+			return reservationRepository.findAllByUser(userId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching reservations by user ID: " + e.getMessage());

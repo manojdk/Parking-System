@@ -30,8 +30,7 @@ public class FeedbackService {
 			// Retrieve the user and reservation
 			User user = userService.getUserById(userId)
 					.orElseThrow(() -> new IllegalArgumentException("User not found."));
-			Reservation reservation = reservationService.getReservationById(reservationId)
-					.orElseThrow(() -> new IllegalArgumentException("Reservation not found."));
+			Reservation reservation = reservationService.getReservationById(reservationId);
 
 			// Create new feedback
 			Feedback feedback = new Feedback();
@@ -46,29 +45,29 @@ public class FeedbackService {
 			throw new RuntimeException("Database error occurred while adding feedback: " + e.getMessage());
 		} catch (IllegalArgumentException e) {
 			throw e;
-		}	
+		}
 	}
 
 	public Optional<Feedback> getFeedbackById(Long feedbackId) {
 		try {
-			return feedbackRepository.findById(feedbackId);
+			return feedbackRepository.findByFeedbackId(feedbackId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while fetching feedback by ID: " + e.getMessage());
 		}
 	}
 
-	public List<Feedback> getFeedbacksByUserId(Long userId) {
+	public List<Feedback> getFeedbacksByUserId(User userId) {
 		try {
-			return feedbackRepository.findAllByUserId(userId);
+			return feedbackRepository.findAllByUser(userId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching feedbacks by user ID: " + e.getMessage());
 		}
 	}
 
-	public List<Feedback> getFeedbacksByReservationId(Long reservationId) {
+	public List<Feedback> getFeedbacksByReservationId(Reservation reservationId) {
 		try {
-			return feedbackRepository.findAllByReservationId(reservationId);
+			return feedbackRepository.findAllByReservation(reservationId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching feedbacks by reservation ID: " + e.getMessage());
