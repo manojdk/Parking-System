@@ -1,6 +1,8 @@
 package com.parkingSystem.service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
@@ -44,21 +46,65 @@ public class ParkingSpaceService {
 		}
 	}
 
-	@Transactional
-	public ParkingSpace addParkingSpace(ParkingSpace parkingSpace) {
+	public Map<String, Object> getParkingSpaceDetails(Long parkingSpaceId) {
 		try {
-			return parkingSpaceRepository.save(parkingSpace);
+			Optional<ParkingSpace> parkingSpaceOptional = getParkingSpaceById(parkingSpaceId);
+			if (parkingSpaceOptional.isEmpty()) {
+				throw new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId);
+			}
+
+			ParkingSpace parkingSpace = parkingSpaceOptional.get();
+			Map<String, Object> parkingSpaceDetails = new HashMap<>();
+			parkingSpaceDetails.put("parkingSpaceId", parkingSpace.getParkingSpaceId());
+			parkingSpaceDetails.put("location", parkingSpace.getLocation());
+			parkingSpaceDetails.put("type", parkingSpace.getType());
+			parkingSpaceDetails.put("rate", parkingSpace.getRate());
+			parkingSpaceDetails.put("availabilityStatus", parkingSpace.isAvailabilityStatus());
+
+			return parkingSpaceDetails;
 		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while adding new parking space: " + e.getMessage());
+			throw new RuntimeException(
+					"Database error occurred while fetching parking space details: " + e.getMessage());
 		}
 	}
 
 	@Transactional
-	public void updateParkingSpace(ParkingSpace parkingSpace) {
+	public ParkingSpace addParkingSpace(String location, String type, Double rate) {
 		try {
-			parkingSpaceRepository.save(parkingSpace);
+			ParkingSpace parkingSpace = new ParkingSpace();
+			parkingSpace.setLocation(location);
+			parkingSpace.setType(type);
+			parkingSpace.setRate(rate);
+			parkingSpace.setAvailabilityStatus(true); // assuming new parking space is available
+
+			return parkingSpaceRepository.save(parkingSpace);
 		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while updating the parking space: " + e.getMessage());
+			throw new RuntimeException("Database error occurred while adding parking space: " + e.getMessage());
+		}
+	}
+
+	@Transactional
+	public ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,
+			Boolean availabilityStatus) {
+		try {
+			Optional<ParkingSpace> parkingSpaceOptional = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
+			if (parkingSpaceOptional.isEmpty()) {
+				throw new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId);
+			}
+
+			ParkingSpace parkingSpace = parkingSpaceOptional.get();
+			if (location != null)
+				parkingSpace.setLocation(location);
+			if (type != null)
+				parkingSpace.setType(type);
+			if (rate != null)
+				parkingSpace.setRate(rate);
+			if (availabilityStatus != null)
+				parkingSpace.setAvailabilityStatus(availabilityStatus);
+
+			return parkingSpaceRepository.save(parkingSpace);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while updating parking space: " + e.getMessage());
 		}
 	}
 
