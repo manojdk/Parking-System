@@ -68,7 +68,7 @@ public class ReservationService {
 			Integer duration) {
 		try {
 			Reservation reservation = getReservationById(reservationId);
-			ParkingSpace parkingSpace = parkingSpaceRepository.findById(parkingSpaceId).orElseThrow(
+			ParkingSpace parkingSpace = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId).orElseThrow(
 					() -> new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId));
 
 			reservation.setParkingSpace(parkingSpace);

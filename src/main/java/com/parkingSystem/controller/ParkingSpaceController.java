@@ -42,7 +42,7 @@ public class ParkingSpaceController {
 	@GetMapping("/available")
 	public ResponseEntity<Object> getAvailableParkingSpaces() {
 		try {
-			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAvailableParkingSpaces();
+			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAvailableParkingSpaces(null);
 			return ResponseEntity.ok(parkingSpaces);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -50,7 +50,7 @@ public class ParkingSpaceController {
 		}
 	}
 
-	@GetMapping("/deatils/id")
+	@GetMapping("/details/id")
 	public ResponseEntity<Object> getParkingSpaceDetails(@RequestParam Long parkingSpaceId) {
 		try {
 			Map<String, Object> parkingSpaceDetails = parkingSpaceService.getParkingSpaceDetails(parkingSpaceId);

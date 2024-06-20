@@ -12,12 +12,11 @@ import com.parkingSystem.model.ParkingSpace;
 @Repository
 public interface ParkingSpaceRepository extends JpaRepository<ParkingSpace, Long> {
 
-	@Query("SELECT p FROM ParkingSpace p WHERE p.availabilityStatus = true")
-	List<ParkingSpace> findAvailableParkingSpaces();
+	// @Query("SELECT p FROM ParkingSpace p WHERE p.availabilityStatus = true")
+	List<ParkingSpace> findByAvailabilityStatus(String availabilityStatus);
 
 	Optional<ParkingSpace> findByParkingSpaceId(Long parkingSpaceId);
 
 	void deleteByParkingSpaceId(Long parkingSpaceId);
-	
-	
+
 }

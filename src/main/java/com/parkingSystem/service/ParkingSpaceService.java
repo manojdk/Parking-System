@@ -28,9 +28,9 @@ public class ParkingSpaceService {
 		}
 	}
 
-	public List<ParkingSpace> getAvailableParkingSpaces() {
+	public List<ParkingSpace> getAvailableParkingSpaces(String availableStatus) {
 		try {
-			return parkingSpaceRepository.findAvailableParkingSpaces();
+			return parkingSpaceRepository.findByAvailabilityStatus(availableStatus);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching available parking spaces: " + e.getMessage());
@@ -91,7 +91,7 @@ public class ParkingSpaceService {
 			parkingSpace.setLocation(location);
 			parkingSpace.setType(type);
 			parkingSpace.setRate(rate);
-			parkingSpace.setAvailabilityStatus("available"); 
+			parkingSpace.setAvailabilityStatus("available");
 
 			return parkingSpaceRepository.save(parkingSpace);
 		} catch (DataAccessException e) {
