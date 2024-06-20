@@ -19,7 +19,7 @@ public class ParkingSpace {
 	private Long parkingSpaceId;
 
 	@Column(name = "availability_status", nullable = false)
-	private Boolean availabilityStatus;
+	private String availabilityStatus;
 
 	@Column(name = "location", nullable = false)
 	private String location;
@@ -30,11 +30,12 @@ public class ParkingSpace {
 	@Column(name = "rate", nullable = false)
 	private Double rate;
 
-	public Boolean isAvailabilityStatus() {
-		return availabilityStatus;
-	}
+	/*
+	 * public Boolean isAvailabilityStatus() { return availabilityStatus; }
+	 */
 	
-	public void setAvailabilityStatus(Boolean availabilityStatus) {
-        this.availabilityStatus = availabilityStatus;
-    }
+	/*
+	 * public void setAvailabilityStatus(Boolean availabilityStatus) {
+	 * this.availabilityStatus = availabilityStatus; }
+	 */
 }

@@ -25,7 +25,7 @@ public class FeedbackService {
 	private ReservationService reservationService;
 
 	@Transactional
-	public Feedback addFeedback(Long userId, Long reservationId, int rating, String comments) {
+	public Feedback addFeedback(Long userId, Long reservationId, Integer rating, String comments) {
 		try {
 			// Retrieve the user and reservation
 			User user = userService.getUserById(userId)

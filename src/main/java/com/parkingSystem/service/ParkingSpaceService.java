@@ -59,12 +59,28 @@ public class ParkingSpaceService {
 			parkingSpaceDetails.put("location", parkingSpace.getLocation());
 			parkingSpaceDetails.put("type", parkingSpace.getType());
 			parkingSpaceDetails.put("rate", parkingSpace.getRate());
-			parkingSpaceDetails.put("availabilityStatus", parkingSpace.isAvailabilityStatus());
+			parkingSpaceDetails.put("availabilityStatus", parkingSpace.getAvailabilityStatus());
 
 			return parkingSpaceDetails;
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching parking space details: " + e.getMessage());
+		}
+	}
+
+	public ParkingSpace updateAvailabilityStatus(Long parkingSpaceId, Boolean isAvailable) {
+		try {
+			Optional<ParkingSpace> parkingSpaceOptional = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
+
+			if (parkingSpaceOptional.isEmpty()) {
+				throw new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId);
+			}
+			ParkingSpace parkingSpace = parkingSpaceOptional.get();
+			parkingSpace.setAvailabilityStatus(isAvailable ? "available" : "occupied");
+			return parkingSpaceRepository.save(parkingSpace);
+
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while updating parking space: " + e.getMessage());
 		}
 	}
 
@@ -75,7 +91,7 @@ public class ParkingSpaceService {
 			parkingSpace.setLocation(location);
 			parkingSpace.setType(type);
 			parkingSpace.setRate(rate);
-			parkingSpace.setAvailabilityStatus(true); // assuming new parking space is available
+			parkingSpace.setAvailabilityStatus("available"); 
 
 			return parkingSpaceRepository.save(parkingSpace);
 		} catch (DataAccessException e) {
@@ -85,7 +101,7 @@ public class ParkingSpaceService {
 
 	@Transactional
 	public ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,
-			Boolean availabilityStatus) {
+			String availabilityStatus) {
 		try {
 			Optional<ParkingSpace> parkingSpaceOptional = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
 			if (parkingSpaceOptional.isEmpty()) {

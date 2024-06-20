@@ -2,6 +2,7 @@ package com.parkingSystem.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
+import com.parkingSystem.repository.ParkingSpaceRepository;
 import com.parkingSystem.repository.ReservationRepository;
 
 import jakarta.transaction.Transactional;
@@ -20,57 +22,80 @@ public class ReservationService {
 
 	private ReservationRepository reservationRepository;
 
+	private ParkingSpaceRepository parkingSpaceRepository;
+
 	private ParkingSpaceService parkingSpaceService;
 
 	private UserService userService;
 
+	public List<Reservation> getAllReservations() {
+		try {
+			return reservationRepository.findAll();
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while fetching all reservations: " + e.getMessage());
+		}
+	}
+
 	@Transactional
-	public Reservation makeReservation(Long userId, Long parkingSpaceId, LocalDateTime reservationTime,
+	public Reservation createReservation(Long userId, Long parkingSpaceId, LocalDateTime reservationTime,
 			Integer durationMinutes) {
 		try {
 			User user = userService.getUserById(userId)
 					.orElseThrow(() -> new IllegalArgumentException("User not found"));
 			ParkingSpace parkingSpace = parkingSpaceService.getParkingSpaceById(parkingSpaceId)
-					.orElseThrow(() -> new IllegalArgumentException("PArking Space not found"));
+					.orElseThrow(() -> new IllegalArgumentException("Parking Space not found"));
 
-			if (!parkingSpace.isAvailabilityStatus()) {
-				throw new IllegalStateException("Parking space is already occupied.");
+			if (!"available".equals(parkingSpace.getAvailabilityStatus())) {
+				throw new IllegalArgumentException("Parking space is not available");
 			}
 
 			Reservation reservation = new Reservation();
-
 			reservation.setUser(user);
 			reservation.setParkingSpace(parkingSpace);
 			reservation.setReservationTime(reservationTime);
 			reservation.setDuration(durationMinutes);
 
-			parkingSpace.setAvailabilityStatus(false);
-			parkingSpaceService.updateParkingSpace(parkingSpace);
+			parkingSpace.setAvailabilityStatus("occupied");
+			parkingSpaceRepository.save(parkingSpace);
+
 			return reservationRepository.save(reservation);
 
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while making reservation: " + e.getMessage());
-		} catch (IllegalArgumentException | IllegalStateException e) {
-			throw e;
+		}
+	}
+
+	public Reservation updateReservation(Long reservationId, LocalDateTime reservationTime, Long parkingSpaceId,
+			Integer duration) {
+		try {
+			Reservation reservation = getReservationById(reservationId);
+			ParkingSpace parkingSpace = parkingSpaceRepository.findById(parkingSpaceId).orElseThrow(
+					() -> new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId));
+
+			reservation.setParkingSpace(parkingSpace);
+			reservation.setReservationTime(reservationTime);
+			reservation.setDuration(duration);
+
+			parkingSpace.setAvailabilityStatus("occupied");
+			parkingSpaceRepository.save(parkingSpace);
+
+			return reservationRepository.save(reservation);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while updating reservation: " + e.getMessage());
 		}
 	}
 
 	@Transactional
-	public void cancelReservation(Long reservationId) {
+	public void deleteReservation(Long reservationId) {
 		try {
-			Reservation reservation = reservationRepository.findByReservationId(reservationId);
-
-			// Mark parking space as available
+			Reservation reservation = getReservationById(reservationId);
 			ParkingSpace parkingSpace = reservation.getParkingSpace();
-			parkingSpace.setAvailabilityStatus(true);
-			parkingSpaceService.updateParkingSpace(parkingSpace);
+			parkingSpace.setAvailabilityStatus("available");
+			parkingSpaceRepository.save(parkingSpace);
 
-			// Delete the reservation
-			reservationRepository.delete(reservation);
+			reservationRepository.deleteById(reservationId);
 		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while canceling reservation: " + e.getMessage());
-		} catch (IllegalArgumentException e) {
-			throw e;
+			throw new RuntimeException("Database error occurred while deleting reservation: " + e.getMessage());
 		}
 	}
 
@@ -90,4 +115,5 @@ public class ReservationService {
 					"Database error occurred while fetching reservations by user ID: " + e.getMessage());
 		}
 	}
+
 }

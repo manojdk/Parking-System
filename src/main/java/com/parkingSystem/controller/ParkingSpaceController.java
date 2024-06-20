@@ -1,15 +1,18 @@
 package com.parkingSystem.controller;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parkingSystem.model.ParkingSpace;
@@ -25,7 +28,7 @@ public class ParkingSpaceController {
 	private ParkingSpaceService parkingSpaceService;
 
 	@GetMapping(value = "/details")
-	public ResponseEntity<List<ParkingSpace>> getAllParkingSpaces() {
+	public ResponseEntity<Object> getAllParkingSpaces() {
 		try {
 			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAllParkingSpaces();
 			return ResponseEntity.ok(parkingSpaces);
@@ -36,33 +39,87 @@ public class ParkingSpaceController {
 		}
 	}
 
-	@PostMapping(value = "/add")
-	public ResponseEntity<Object> addParkingSpaces(@RequestBody ParkingSpace parkingSpace) {
+	@GetMapping("/available")
+	public ResponseEntity<Object> getAvailableParkingSpaces() {
 		try {
-			ParkingSpace addParkingSpaces = parkingSpaceService.addParkingSpace(parkingSpace);
-			return ResponseEntity.ok(addParkingSpaces);
+			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAvailableParkingSpaces();
+			return ResponseEntity.ok(parkingSpaces);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error adding new Parking space: " + e.getMessage());
+					.body("Error fetching available parking spaces: " + e.getMessage());
 		}
 	}
 
-	@GetMapping(value = "/details/space/{id}")
-	public ResponseEntity<Object> getParkingSpaceById(@PathVariable("id") Long id) {
+	@GetMapping("/deatils/id")
+	public ResponseEntity<Object> getParkingSpaceDetails(@RequestParam Long parkingSpaceId) {
 		try {
-			return ResponseEntity.ok(parkingSpaceService.getParkingSpaceById(id));
+			Map<String, Object> parkingSpaceDetails = parkingSpaceService.getParkingSpaceDetails(parkingSpaceId);
+			return ResponseEntity.ok(parkingSpaceDetails);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
 		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Parking space not found with ID: " + id);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error fetching parking space details: " + e.getMessage());
 		}
 	}
 
-	@DeleteMapping("/remove/{id}")
-	public ResponseEntity<Object> deleteParkingSpaceById(@PathVariable("id") Long id) {
+	@PostMapping("/register")
+	public ResponseEntity<Object> addParkingSpace(@RequestBody Map<String, String> request) {
 		try {
-			parkingSpaceService.deleteParkingSpace(id);
-			return ResponseEntity.ok("Parking space deleted successfully");
+			String location = request.get("location");
+			String type = request.get("type");
+			Double rate = Double.parseDouble(request.get("rate"));
+
+			ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(location, type, rate);
+
+			Map<String, Object> response = new HashMap<>();
+			response.put("status", "success");
+			response.put("message", "Parking space added successfully");
+			response.put("parkingSpaceId", addedParkingSpace.getParkingSpaceId());
+
+			return ResponseEntity.ok(response);
 		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Parking space not found with ID: " + id);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error adding parking space: " + e.getMessage());
+		}
+	}
+
+	@PutMapping("/update")
+	public ResponseEntity<Object> updateParkingSpace(@RequestBody Map<String, Object> request) {
+		try {
+			Long parkingSpaceId = Long.parseLong(request.get("parkingSpaceId").toString());
+			String location = (String) request.get("location");
+			String type = (String) request.get("type");
+			Double rate = request.containsKey("rate") ? Double.parseDouble(request.get("rate").toString()) : null;
+			String availabilityStatus = (String) request.get("availabilityStatus");
+
+			ParkingSpace updatedParkingSpace = parkingSpaceService.updateParkingSpace(parkingSpaceId, location, type,
+					rate, availabilityStatus);
+
+			Map<String, Object> response = new HashMap<>();
+			response.put("status", "success");
+			response.put("message", "Parking space updated successfully");
+			response.put("parkingSpaceId", updatedParkingSpace.getParkingSpaceId());
+
+			return ResponseEntity.ok(response);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error updating parking space: " + e.getMessage());
+		}
+	}
+
+	@DeleteMapping("/remove")
+	public ResponseEntity<Object> deleteParkingSpaceById(@RequestParam Long parkingSpaceId) {
+		try {
+			parkingSpaceService.deleteParkingSpace(parkingSpaceId);
+			Map<String, Object> response = new HashMap<>();
+			response.put("status", "success");
+			response.put("message", "Parking space deleted successfully");
+			return ResponseEntity.ok(response);
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Parking space not found with ID: " + parkingSpaceId);
 		}
 	}
 }
