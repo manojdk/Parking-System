@@ -78,15 +78,14 @@ public class ReservationService {
 		}
 	}
 
-	public Reservation updateReservation(Long reservationId, LocalDateTime reservationTime, Long parkingSpaceId,
-			Integer duration) {
+	public Reservation updateReservation(Long reservationId, Long parkingSpaceId, Integer duration) {
 		try {
 			Reservation reservation = getReservationById(reservationId);
 			ParkingSpace parkingSpace = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId).orElseThrow(
 					() -> new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId));
 
 			reservation.setParkingSpace(parkingSpace);
-			reservation.setReservationTime(reservationTime);
+			reservation.setReservationTime(reservation.getReservationTime());
 			reservation.setDuration(duration);
 
 			parkingSpace.setAvailabilityStatus("occupied");
