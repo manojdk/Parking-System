@@ -4,6 +4,7 @@ import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,6 +23,15 @@ public class UserService {
 
 	private UserRepository userRepository;
 
+	/**
+	 * Register new user
+	 * 
+	 * @param userName     User name
+	 * @param email        User email
+	 * @param password
+	 * @param licensePlate License no. of vehicle
+	 * @return User data to repository
+	 */
 	@Transactional
 	public User registerUser(String userName, String email, String password, String licensePlate) {
 		try {
@@ -51,6 +61,12 @@ public class UserService {
 		}
 	}
 
+	/**
+	 * Get user detail by userId
+	 * 
+	 * @param userId User ID
+	 * @return User data
+	 */
 	public Map<String, Object> getUserDeatils(Long userId) {
 		try {
 			Optional<User> userOptional = getUserById(userId);
@@ -77,6 +93,16 @@ public class UserService {
 		}
 	}
 
+	/**
+	 * Update user data
+	 * 
+	 * @param userId       User ID
+	 * @param userName     User name
+	 * @param userEmail    User Email
+	 * @param password
+	 * @param licensePlate License no. of vehicle
+	 * @return Updated user data saved
+	 */
 	public User updateUser(Long userId, String userName, String userEmail, String password, String licensePlate) {
 		try {
 			Optional<User> userOptional = userRepository.findByUserId(userId);
@@ -101,6 +127,12 @@ public class UserService {
 		}
 	}
 
+	/**
+	 * Get user data by userId helper class
+	 * 
+	 * @param userId User ID
+	 * @return user data by Id
+	 */
 	public Optional<User> getUserById(Long userId) {
 		try {
 			return userRepository.findByUserId(userId);
@@ -109,19 +141,19 @@ public class UserService {
 		}
 	}
 
-	public Optional<User> getUserByUsername(String username) {
+	/**
+	 * Get User details by User name and User email
+	 * 
+	 * @param username  User name
+	 * @param userEmail User email
+	 * @return User detail
+	 */
+	public Optional<List<User>> getUserByUsername(String username, String userEmail) {
 		try {
-			return Optional.ofNullable(userRepository.findByUserName(username));
+			return Optional.ofNullable(userRepository.findByUserNameAndUserEmail(username, userEmail));
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while fetching user by Name" + e.getMessage());
 		}
 	}
 
-	public Optional<User> getUserByUseremail(String email) {
-		try {
-			return Optional.ofNullable(userRepository.findByUserEmail(email));
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching user by Name" + e.getMessage());
-		}
-	}
 }

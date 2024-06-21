@@ -6,13 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.parkingSystem.model.User;
+import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-	User findByUserName(String userName);
-
-	User findByUserEmail(String userEmail);
+	List<User> findByUserNameAndUserEmail(String userName, String userEmail);
 
 	Boolean existsByUserName(String userName);
 

@@ -2,3 +2,4 @@
 2. Implement Spring Security, User Authentication 
 3. Update reservation by "reservationId" and "duration" -> in response "updatedAt" time 
 4. Unregistered user should be able to see parking availability
+5. Find user by "UserName" and "UserEmail" API

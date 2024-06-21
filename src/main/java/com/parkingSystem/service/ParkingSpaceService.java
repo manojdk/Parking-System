@@ -21,6 +21,11 @@ public class ParkingSpaceService {
 
 	private ParkingSpaceRepository parkingSpaceRepository;
 
+	/**
+	 * Get all Parking Spaces details
+	 * 
+	 * @return Parking space data
+	 */
 	public List<ParkingSpace> getAllParkingSpaces() {
 		try {
 			return parkingSpaceRepository.findAll();
@@ -29,6 +34,12 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * Get Parking space detail by parkingSpaceId (helper class)
+	 * 
+	 * @param parkingSpaceId Parking space ID
+	 * @return Parking space data
+	 */
 	public Optional<ParkingSpace> getParkingSpaceById(long parkingSpaceId) {
 		try {
 			return parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
@@ -38,6 +49,12 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * Get available Parking space detail
+	 * 
+	 * @param availabilityStatus Status available or occupied
+	 * @return Parking space data
+	 */
 	public List<ParkingSpace> getAvailableParkingSpaces(String availabilityStatus) {
 		try {
 			return parkingSpaceRepository.findByAvailabilityStatus(availabilityStatus);
@@ -47,6 +64,12 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * Get Parking Space detail by parkingSpaceId
+	 * 
+	 * @param parkingSpaceId Parking space ID
+	 * @return Parking space data
+	 */
 	public Map<String, Object> getParkingSpaceDetails(Long parkingSpaceId) {
 		try {
 			Optional<ParkingSpace> parkingSpaceOptional = getParkingSpaceById(parkingSpaceId);
@@ -69,26 +92,14 @@ public class ParkingSpaceService {
 		}
 	}
 
-	public ParkingSpace updateAvailabilityStatus(Long parkingSpaceId, Boolean isAvailable) {
-		try {
-			Optional<ParkingSpace> parkingSpaceOptional = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
-
-			if (parkingSpaceOptional.isEmpty()) {
-				throw new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId);
-			}
-			ParkingSpace parkingSpace = parkingSpaceOptional.get();
-			parkingSpace.setAvailabilityStatus(isAvailable ? "available" : "occupied");
-			return parkingSpaceRepository.save(parkingSpace);
-
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while updating parking space: " + e.getMessage());
-		}
-	}
-
+	/**
+	 * 
+	 * @param parkingSpace
+	 * @return
+	 */
 	@Transactional
 	public ParkingSpace addParkingSpace(ParkingSpace parkingSpace) {
 		try {
-			// ParkingSpace parkingSpace = new ParkingSpace();
 			parkingSpace.setLocation(parkingSpace.getLocation());
 			parkingSpace.setType(parkingSpace.getType());
 			parkingSpace.setRate(parkingSpace.getRate());
@@ -100,6 +111,11 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * 
+	 * @param parkingSpaceRequests
+	 * @return
+	 */
 	@Transactional
 	public List<ParkingSpace> addMultipleParkingSpaces(List<ParkingSpace> parkingSpaceRequests) {
 		try {
@@ -118,6 +134,15 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * 
+	 * @param parkingSpaceId
+	 * @param location
+	 * @param type
+	 * @param rate
+	 * @param availabilityStatus
+	 * @return
+	 */
 	@Transactional
 	public ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,
 			Boolean availabilityStatus) {
@@ -126,7 +151,6 @@ public class ParkingSpaceService {
 			if (parkingSpaceOptional.isEmpty()) {
 				throw new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId);
 			}
-
 			ParkingSpace parkingSpace = parkingSpaceOptional.get();
 			if (location != null)
 				parkingSpace.setLocation(location);
@@ -143,6 +167,11 @@ public class ParkingSpaceService {
 		}
 	}
 
+	/**
+	 * Delete Parking space by Parking space Id
+	 * 
+	 * @param parkingSpaceId Parking space ID
+	 */
 	@Transactional
 	public void deleteParkingSpace(Long parkingSpaceId) {
 		try {
