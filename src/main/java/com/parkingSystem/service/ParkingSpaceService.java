@@ -93,9 +93,10 @@ public class ParkingSpaceService {
 	}
 
 	/**
+	 * Adding Parking space
 	 * 
-	 * @param parkingSpace
-	 * @return
+	 * @param parkingSpace {@link ParkingSpace}
+	 * @return save Parking space data
 	 */
 	@Transactional
 	public ParkingSpace addParkingSpace(ParkingSpace parkingSpace) {
@@ -112,9 +113,10 @@ public class ParkingSpaceService {
 	}
 
 	/**
+	 * Add list of Parking space
 	 * 
-	 * @param parkingSpaceRequests
-	 * @return
+	 * @param parkingSpaceRequests list of {@link ParkingSpace}
+	 * @return List of saved Parking space data
 	 */
 	@Transactional
 	public List<ParkingSpace> addMultipleParkingSpaces(List<ParkingSpace> parkingSpaceRequests) {
@@ -135,13 +137,14 @@ public class ParkingSpaceService {
 	}
 
 	/**
+	 * Update Parking Space Data
 	 * 
-	 * @param parkingSpaceId
-	 * @param location
-	 * @param type
-	 * @param rate
-	 * @param availabilityStatus
-	 * @return
+	 * @param parkingSpaceId     Parking space ID
+	 * @param location           Location of parking space
+	 * @param type               Type of space
+	 * @param rate               Rate of parking space
+	 * @param availabilityStatus Availaible space
+	 * @return Updated Parking space data
 	 */
 	@Transactional
 	public ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,

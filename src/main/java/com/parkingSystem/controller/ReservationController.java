@@ -2,6 +2,7 @@ package com.parkingSystem.controller;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,13 +46,18 @@ public class ReservationController {
 		try {
 			Long userId = Long.parseLong(request.get("userId"));
 			Long parkingSpaceId = Long.parseLong(request.get("parkingSpaceId"));
-			LocalDateTime reservationTime = LocalDateTime.parse(request.get("reservationTime"));
+			// LocalDateTime reservationTime =
+			// LocalDateTime.parse(request.get("reservationTime"));
 			Integer duration = Integer.parseInt(request.get("duration"));
 
-			Reservation response = reservationService.createReservation(userId, parkingSpaceId, reservationTime,
-					duration);
+			Reservation createdReservation = reservationService.createReservation(userId, parkingSpaceId,
+					 duration);
+			Map<String, Object> response = new LinkedHashMap<>();
+			response.put("status", "success");
+			response.put("message", "Reservation created successfully");
+			response.put("reservation", createdReservation);
 
-			return ResponseEntity.ok(response);
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error making reservation: " + e.getMessage());

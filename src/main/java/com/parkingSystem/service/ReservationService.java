@@ -27,6 +27,11 @@ public class ReservationService {
 
 	private UserService userService;
 
+	/**
+	 * Get all Reservation details
+	 * 
+	 * @return Reservation data
+	 */
 	public List<Reservation> getAllReservations() {
 		try {
 			return reservationRepository.findAll();
@@ -35,9 +40,18 @@ public class ReservationService {
 		}
 	}
 
+	/**
+	 * Reserving Parking space for User
+	 * 
+	 * @param userId
+	 * @param parkingSpaceId
+	 * @param reservationTime
+	 * @param durationMinutes
+	 * @return
+	 */
+
 	@Transactional
-	public Reservation createReservation(Long userId, Long parkingSpaceId, LocalDateTime reservationTime,
-			Integer durationMinutes) {
+	public Reservation createReservation(Long userId, Long parkingSpaceId, Integer duration) {
 		try {
 			User user = userService.getUserById(userId)
 					.orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -51,8 +65,8 @@ public class ReservationService {
 			Reservation reservation = new Reservation();
 			reservation.setUser(user);
 			reservation.setParkingSpace(parkingSpace);
-			reservation.setReservationTime(reservationTime);
-			reservation.setDuration(durationMinutes);
+			reservation.setReservationTime(LocalDateTime.now());
+			reservation.setDuration(duration);
 
 			parkingSpace.setAvailabilityStatus("occupied");
 			parkingSpaceRepository.save(parkingSpace);

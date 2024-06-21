@@ -29,7 +29,7 @@ public class Feedback {
 	private Reservation reservation;
 
 	@Column(name = "rating", nullable = false)
-	private int rating; // Assuming rating is on a scale of 1 to 5
+	private Integer rating; 
 
 	@Column(name = "comments")
 	private String comments;
