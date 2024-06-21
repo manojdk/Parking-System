@@ -16,5 +16,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
 	List<Feedback> findAllByReservation(Reservation reservation);
 
-	Optional<Feedback> findByFeedbackId(Long feedbackId);
+	Feedback findByFeedbackId(Long feedbackId);
+
+	void deleteByFeedbackId(Long feedbackId);
 }

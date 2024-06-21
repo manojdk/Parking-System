@@ -27,26 +27,14 @@ public class ParkingSpaceController {
 
 	private ParkingSpaceService parkingSpaceService;
 
-	@GetMapping(value = "/details")
+	@GetMapping(value = "/all/details")
 	public ResponseEntity<Object> getAllParkingSpaces() {
 		try {
 			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAllParkingSpaces();
 			return ResponseEntity.ok(parkingSpaces);
 		} catch (Exception e) {
-			// return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-			e.getMessage();
-			return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-		}
-	}
-
-	@GetMapping("/available")
-	public ResponseEntity<Object> getAvailableParkingSpaces() {
-		try {
-			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAvailableParkingSpaces(null);
-			return ResponseEntity.ok(parkingSpaces);
-		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error fetching available parking spaces: " + e.getMessage());
+					.body("Error fetching parking spaces: " + e.getMessage());
 		}
 	}
 
@@ -64,23 +52,29 @@ public class ParkingSpaceController {
 	}
 
 	@PostMapping("/register")
-	public ResponseEntity<Object> addParkingSpace(@RequestBody Map<String, String> request) {
+	public ResponseEntity<Object> addParkingSpace(@RequestBody ParkingSpace request) {
 		try {
-			String location = request.get("location");
-			String type = request.get("type");
-			Double rate = Double.parseDouble(request.get("rate"));
+//			String location = request.get("location");
+//			String type = request.get("type");
+//			Double rate = Double.parseDouble(request.get("rate"));
 
-			ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(location, type, rate);
+			ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(request);
 
-			Map<String, Object> response = new HashMap<>();
-			response.put("status", "success");
-			response.put("message", "Parking space added successfully");
-			response.put("parkingSpaceId", addedParkingSpace.getParkingSpaceId());
-
-			return ResponseEntity.ok(response);
+			return ResponseEntity.ok(addedParkingSpace);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error adding parking space: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/register/multiple")
+	public ResponseEntity<Object> addMultipleParkingSpaces(@RequestBody List<ParkingSpace> parkingSpaceRequests) {
+		try {
+			List<ParkingSpace> addedParkingSpaces = parkingSpaceService.addMultipleParkingSpaces(parkingSpaceRequests);
+			return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpaces);
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error adding parking spaces: " + e.getMessage());
 		}
 	}
 
@@ -91,17 +85,12 @@ public class ParkingSpaceController {
 			String location = (String) request.get("location");
 			String type = (String) request.get("type");
 			Double rate = request.containsKey("rate") ? Double.parseDouble(request.get("rate").toString()) : null;
-			String availabilityStatus = (String) request.get("availabilityStatus");
+			Boolean availabilityStatus = Boolean.valueOf(request.get("availabilityStatus").toString());
 
 			ParkingSpace updatedParkingSpace = parkingSpaceService.updateParkingSpace(parkingSpaceId, location, type,
 					rate, availabilityStatus);
 
-			Map<String, Object> response = new HashMap<>();
-			response.put("status", "success");
-			response.put("message", "Parking space updated successfully");
-			response.put("parkingSpaceId", updatedParkingSpace.getParkingSpaceId());
-
-			return ResponseEntity.ok(response);
+			return ResponseEntity.ok(updatedParkingSpace);
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
 		} catch (Exception e) {
@@ -119,7 +108,20 @@ public class ParkingSpaceController {
 			response.put("message", "Parking space deleted successfully");
 			return ResponseEntity.ok(response);
 		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Parking space not found with ID: " + parkingSpaceId);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body("Parking space not found with ID: " + parkingSpaceId);
+		}
+	}
+
+	@GetMapping("/available")
+	public ResponseEntity<Object> getAvailableParkingSpaces(@RequestParam String availabilityStatus) {
+		try {
+			List<ParkingSpace> availableParkingSpaces = parkingSpaceService
+					.getAvailableParkingSpaces(availabilityStatus);
+			return ResponseEntity.ok(availableParkingSpaces);
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("Error fetching available parking spaces: " + e.getMessage());
 		}
 	}
 }

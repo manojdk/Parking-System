@@ -1,7 +1,6 @@
 package com.parkingSystem.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -10,6 +9,8 @@ import com.parkingSystem.model.Feedback;
 import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.FeedbackRepository;
+import com.parkingSystem.repository.ReservationRepository;
+import com.parkingSystem.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -20,17 +21,26 @@ public class FeedbackService {
 
 	private FeedbackRepository feedbackRepository;
 
-	private UserService userService;
+	private UserRepository userRepository;
 
-	private ReservationService reservationService;
+	private ReservationRepository reservationRepository;
+
+	public List<Feedback> getAllFeedback() {
+		try {
+			return feedbackRepository.findAll();
+		} catch (DataAccessException e) {
+			throw new RuntimeException(
+					"Error occurred while fetching feedback data: " + e.getMostSpecificCause().getMessage());
+		}
+	}
 
 	@Transactional
-	public Feedback addFeedback(Long userId, Long reservationId, Integer rating, String comments) {
+	public Feedback createFeedback(Long userId, Long reservationId, Integer rating, String comments) {
 		try {
 			// Retrieve the user and reservation
-			User user = userService.getUserById(userId)
+			User user = userRepository.findByUserId(userId)
 					.orElseThrow(() -> new IllegalArgumentException("User not found."));
-			Reservation reservation = reservationService.getReservationById(reservationId);
+			Reservation reservation = reservationRepository.findByReservationId(reservationId);
 
 			// Create new feedback
 			Feedback feedback = new Feedback();
@@ -48,11 +58,30 @@ public class FeedbackService {
 		}
 	}
 
-	public Optional<Feedback> getFeedbackById(Long feedbackId) {
+	public Feedback getFeedbackById(Long feedbackId) {
 		try {
 			return feedbackRepository.findByFeedbackId(feedbackId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while fetching feedback by ID: " + e.getMessage());
+		}
+	}
+
+	@Transactional
+	public Feedback updateFeedback(Long feedbackId, Integer rating, String comments) {
+		try {
+			Feedback feedback = feedbackRepository.findByFeedbackId(feedbackId);
+
+			if (rating != null) {
+				feedback.setRating(rating);
+			}
+			if (comments != null) {
+				feedback.setComments(comments);
+			}
+
+			return feedbackRepository.save(feedback);
+		} catch (DataAccessException e) {
+			throw new RuntimeException(
+					"Database error occurred while updating feedback: " + e.getMostSpecificCause().getMessage());
 		}
 	}
 
@@ -71,6 +100,16 @@ public class FeedbackService {
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching feedbacks by reservation ID: " + e.getMessage());
+		}
+	}
+
+	@Transactional
+	public void deleteFeedback(Long feedbackId) {
+		try {
+			feedbackRepository.deleteByFeedbackId(feedbackId);
+		} catch (DataAccessException e) {
+			throw new RuntimeException(
+					"Database error occurred while deleting feedback: " + e.getMostSpecificCause().getMessage());
 		}
 	}
 }

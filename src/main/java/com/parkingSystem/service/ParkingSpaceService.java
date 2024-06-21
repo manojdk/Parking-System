@@ -4,12 +4,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.parkingSystem.model.ParkingSpace;
-import com.parkingSystem.repository.ParkingSpaceRepository;
+import com.parkingSystem.uuidTest.ParkingSpaceRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -28,21 +29,21 @@ public class ParkingSpaceService {
 		}
 	}
 
-	public List<ParkingSpace> getAvailableParkingSpaces(String availableStatus) {
-		try {
-			return parkingSpaceRepository.findByAvailabilityStatus(availableStatus);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while fetching available parking spaces: " + e.getMessage());
-		}
-	}
-
 	public Optional<ParkingSpace> getParkingSpaceById(long parkingSpaceId) {
 		try {
 			return parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
 		} catch (DataAccessException e) {
 			throw new RuntimeException(
 					"Database error occurred while fetching parking spaces by ID: " + e.getMessage());
+		}
+	}
+
+	public List<ParkingSpace> getAvailableParkingSpaces(String availabilityStatus) {
+		try {
+			return parkingSpaceRepository.findByAvailabilityStatus(availabilityStatus);
+		} catch (DataAccessException e) {
+			throw new RuntimeException(
+					"Database error occurred while fetching available parking spaces: " + e.getMessage());
 		}
 	}
 
@@ -85,12 +86,12 @@ public class ParkingSpaceService {
 	}
 
 	@Transactional
-	public ParkingSpace addParkingSpace(String location, String type, Double rate) {
+	public ParkingSpace addParkingSpace(ParkingSpace parkingSpace) {
 		try {
-			ParkingSpace parkingSpace = new ParkingSpace();
-			parkingSpace.setLocation(location);
-			parkingSpace.setType(type);
-			parkingSpace.setRate(rate);
+			// ParkingSpace parkingSpace = new ParkingSpace();
+			parkingSpace.setLocation(parkingSpace.getLocation());
+			parkingSpace.setType(parkingSpace.getType());
+			parkingSpace.setRate(parkingSpace.getRate());
 			parkingSpace.setAvailabilityStatus("available");
 
 			return parkingSpaceRepository.save(parkingSpace);
@@ -100,8 +101,26 @@ public class ParkingSpaceService {
 	}
 
 	@Transactional
+	public List<ParkingSpace> addMultipleParkingSpaces(List<ParkingSpace> parkingSpaceRequests) {
+		try {
+			List<ParkingSpace> parkingSpaces = parkingSpaceRequests.stream().map(request -> {
+				ParkingSpace parkingSpace = new ParkingSpace();
+				parkingSpace.setLocation(request.getLocation());
+				parkingSpace.setType(request.getType());
+				parkingSpace.setRate(request.getRate());
+				parkingSpace.setAvailabilityStatus("available");
+				return parkingSpace;
+			}).collect(Collectors.toList());
+			return parkingSpaceRepository.saveAll(parkingSpaces);
+		} catch (DataAccessException e) {
+			throw new RuntimeException(
+					"Database error occurred while adding multiple parking spaces: " + e.getMessage());
+		}
+	}
+
+	@Transactional
 	public ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,
-			String availabilityStatus) {
+			Boolean availabilityStatus) {
 		try {
 			Optional<ParkingSpace> parkingSpaceOptional = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
 			if (parkingSpaceOptional.isEmpty()) {
@@ -116,7 +135,7 @@ public class ParkingSpaceService {
 			if (rate != null)
 				parkingSpace.setRate(rate);
 			if (availabilityStatus != null)
-				parkingSpace.setAvailabilityStatus(availabilityStatus);
+				parkingSpace.setAvailabilityStatus(availabilityStatus ? "available" : "occupied");
 
 			return parkingSpaceRepository.save(parkingSpace);
 		} catch (DataAccessException e) {

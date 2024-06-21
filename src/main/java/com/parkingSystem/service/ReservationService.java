@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
-import com.parkingSystem.repository.ParkingSpaceRepository;
 import com.parkingSystem.repository.ReservationRepository;
+import com.parkingSystem.uuidTest.ParkingSpaceRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;

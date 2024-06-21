@@ -1,22 +1,26 @@
-package com.parkingSystem.model;
+package com.parkingSystem.uuidTest;
+
+import java.util.UUID;
+
+import org.hibernate.annotations.GenericGenerator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
-@Table(name = "parking_spaces")
+@Table(name = "paring_test_uuid")
 @Data
-public class ParkingSpace {
+public class ParkingSpaceTest {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	@Column(name = "parking_space_id")
-	private Long parkingSpaceId;
+	@GeneratedValue(generator = "uuid")
+	@GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
+	@Column(name = "parking_space_id", columnDefinition = "uuid", updatable = false)
+	private UUID parkingSpaceId;
 
 	@Column(name = "availability_status", nullable = false)
 	private String availabilityStatus;
@@ -29,5 +33,4 @@ public class ParkingSpace {
 
 	@Column(name = "rate", nullable = false)
 	private Double rate;
-
 }
