@@ -48,13 +48,8 @@ public class ReservationController {
 			LocalDateTime reservationTime = LocalDateTime.parse(request.get("reservationTime"));
 			Integer duration = Integer.parseInt(request.get("duration"));
 
-			Reservation reservation = reservationService.createReservation(userId, parkingSpaceId, reservationTime,
+			Reservation response = reservationService.createReservation(userId, parkingSpaceId, reservationTime,
 					duration);
-
-			Map<String, Object> response = new HashMap<>();
-			response.put("status", "success");
-			response.put("message", "Reservation successful");
-			response.put("reservationId", reservation.getReservationId());
 
 			return ResponseEntity.ok(response);
 		} catch (Exception e) {
@@ -103,12 +98,7 @@ public class ReservationController {
 			Reservation updatedReservation = reservationService.updateReservation(reservationId, reservationTime,
 					reservationId, duration);
 
-			Map<String, Object> response = new HashMap<>();
-			response.put("status", "success");
-			response.put("message", "Reservation updated successfully");
-			response.put("reservationId", updatedReservation.getReservationId());
-
-			return ResponseEntity.ok(response);
+			return ResponseEntity.ok(updatedReservation);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("Error updating reservation: " + e.getMessage());

@@ -1,2 +1,4 @@
 1. Update parking space by "Location" and "availabilityStatus" (available-occupied)
-2. 
+2. Implement Spring Security, User Authentication 
+3. Update reservation by "reservationId" and "duration" -> in response "updatedAt" time 
+4. Unregistered user should be able to see parking availability

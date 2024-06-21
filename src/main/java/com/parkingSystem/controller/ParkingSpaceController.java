@@ -54,12 +54,7 @@ public class ParkingSpaceController {
 	@PostMapping("/register")
 	public ResponseEntity<Object> addParkingSpace(@RequestBody ParkingSpace request) {
 		try {
-//			String location = request.get("location");
-//			String type = request.get("type");
-//			Double rate = Double.parseDouble(request.get("rate"));
-
 			ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(request);
-
 			return ResponseEntity.ok(addedParkingSpace);
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
