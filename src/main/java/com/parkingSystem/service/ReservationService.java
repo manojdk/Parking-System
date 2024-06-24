@@ -78,6 +78,14 @@ public class ReservationService {
 		}
 	}
 
+	/**
+	 * Update reservation details
+	 * 
+	 * @param reservationId
+	 * @param parkingSpaceId
+	 * @param duration
+	 * @return Updated reservation details
+	 */
 	public Reservation updateReservation(Long reservationId, Long parkingSpaceId, Integer duration) {
 		try {
 			Reservation reservation = getReservationById(reservationId);
@@ -97,6 +105,11 @@ public class ReservationService {
 		}
 	}
 
+	/**
+	 * Delete reservation by reservationId
+	 * 
+	 * @param reservationId
+	 */
 	@Transactional
 	public void deleteReservation(Long reservationId) {
 		try {
@@ -111,6 +124,12 @@ public class ReservationService {
 		}
 	}
 
+	/**
+	 * Get reservation detail by reservationId
+	 * 
+	 * @param reservationId
+	 * @return Reservation data
+	 */
 	public Reservation getReservationById(Long reservationId) {
 		try {
 			return reservationRepository.findByReservationId(reservationId);
@@ -119,6 +138,12 @@ public class ReservationService {
 		}
 	}
 
+	/**
+	 * Get reservation detail by UserId
+	 * 
+	 * @param userId
+	 * @return Reservation data
+	 */
 	public List<Reservation> getReservationsByUserId(User userId) {
 		try {
 			return reservationRepository.findAllByUser(userId);

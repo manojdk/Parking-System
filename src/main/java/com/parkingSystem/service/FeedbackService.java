@@ -25,6 +25,11 @@ public class FeedbackService {
 
 	private ReservationRepository reservationRepository;
 
+	/**
+	 * Get all Feedback Details
+	 * 
+	 * @return Feedback data
+	 */
 	public List<Feedback> getAllFeedback() {
 		try {
 			return feedbackRepository.findAll();
@@ -34,6 +39,15 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Create new Feedback with parameters
+	 * 
+	 * @param userId
+	 * @param reservationId
+	 * @param rating
+	 * @param comments
+	 * @return new Feedback Data
+	 */
 	@Transactional
 	public Feedback createFeedback(Long userId, Long reservationId, Integer rating, String comments) {
 		try {
@@ -58,6 +72,12 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Get Feedback details by feedbackId
+	 * 
+	 * @param feedbackId
+	 * @return Feedback data
+	 */
 	public Feedback getFeedbackById(Long feedbackId) {
 		try {
 			return feedbackRepository.findByFeedbackId(feedbackId);
@@ -66,6 +86,14 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Update Feedback details
+	 * 
+	 * @param feedbackId
+	 * @param rating
+	 * @param comments
+	 * @return Updated Feedback data
+	 */
 	@Transactional
 	public Feedback updateFeedback(Long feedbackId, Integer rating, String comments) {
 		try {
@@ -85,6 +113,12 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Get Feedback details by userId
+	 * 
+	 * @param userId
+	 * @return Feedback Data
+	 */
 	public List<Feedback> getFeedbacksByUserId(User userId) {
 		try {
 			return feedbackRepository.findAllByUser(userId);
@@ -94,6 +128,12 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Get Feedback details by reservationId
+	 * 
+	 * @param reservationId
+	 * @return Feedback Data
+	 */
 	public List<Feedback> getFeedbacksByReservationId(Reservation reservationId) {
 		try {
 			return feedbackRepository.findAllByReservation(reservationId);
@@ -103,6 +143,11 @@ public class FeedbackService {
 		}
 	}
 
+	/**
+	 * Delete Feedback by FeedbackId
+	 * 
+	 * @param feedbackId
+	 */
 	@Transactional
 	public void deleteFeedback(Long feedbackId) {
 		try {
