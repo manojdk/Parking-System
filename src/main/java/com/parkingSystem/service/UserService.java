@@ -16,12 +16,16 @@ import com.parkingSystem.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Transactional
 @AllArgsConstructor
+@Slf4j
 public class UserService {
 
 	private UserRepository userRepository;
+
 
 	/**
 	 * Register new user
@@ -32,7 +36,6 @@ public class UserService {
 	 * @param licensePlate License no. of vehicle
 	 * @return User data to repository
 	 */
-	@Transactional
 	public User registerUser(String userName, String email, String password, String licensePlate) {
 		try {
 			// Check if the username or email already exists
@@ -54,9 +57,11 @@ public class UserService {
 
 			return userRepository.save(user);
 		} catch (DataAccessException e) {
+			log.error("error : ", e);
 			throw new RuntimeException("Database error occurred while registering user: " + e.getMessage());
 
 		} catch (IllegalArgumentException e) {
+			log.error("error : ", e);
 			throw e;
 		}
 	}
