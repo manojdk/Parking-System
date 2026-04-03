@@ -1,4 +1,4 @@
-package com.parkingSystem.service;
+package com.parkingSystem.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,21 +11,24 @@ import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.ReservationRepository;
 import com.parkingSystem.uuidTest.ParkingSpaceRepository;
+import com.parkingSystem.service.IParkingSpaceService;
+import com.parkingSystem.service.IUserService;
+import com.parkingSystem.service.IReservationService;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 
 @Service
 @AllArgsConstructor
-public class ReservationService {
+public class ReservationServiceImpl implements IReservationService {
 
 	private ReservationRepository reservationRepository;
 
 	private ParkingSpaceRepository parkingSpaceRepository;
 
-	private ParkingSpaceService parkingSpaceService;
+	private IParkingSpaceService parkingSpaceService;
 
-	private UserService userService;
+	private IUserService userService;
 
 	/**
 	 * Get all Reservation details

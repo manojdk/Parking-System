@@ -1,5 +1,6 @@
-package com.parkingSystem.service;
+package com.parkingSystem.service.impl;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,15 +10,17 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.uuidTest.ParkingSpaceRepository;
+import com.parkingSystem.service.IParkingSpaceService;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 
 @Service
 @AllArgsConstructor
-public class ParkingSpaceService {
+public class ParkingSpaceServiceImpl implements IParkingSpaceService {
 
 	private ParkingSpaceRepository parkingSpaceRepository;
 
@@ -81,8 +84,8 @@ public class ParkingSpaceService {
 			Map<String, Object> parkingSpaceDetails = new HashMap<>();
 			parkingSpaceDetails.put("parkingSpaceId", parkingSpace.getParkingSpaceId());
 			parkingSpaceDetails.put("location", parkingSpace.getLocation());
-			parkingSpaceDetails.put("type", parkingSpace.getType());
-			parkingSpaceDetails.put("rate", parkingSpace.getRate());
+			parkingSpaceDetails.put("type", parkingSpace.getSlotType());
+			parkingSpaceDetails.put("rate", parkingSpace.getRatePerHour());
 			parkingSpaceDetails.put("availabilityStatus", parkingSpace.getAvailabilityStatus());
 
 			return parkingSpaceDetails;
@@ -102,8 +105,8 @@ public class ParkingSpaceService {
 	public ParkingSpace addParkingSpace(ParkingSpace parkingSpace) {
 		try {
 			parkingSpace.setLocation(parkingSpace.getLocation());
-			parkingSpace.setType(parkingSpace.getType());
-			parkingSpace.setRate(parkingSpace.getRate());
+			parkingSpace.setSlotType(parkingSpace.getSlotType());
+			parkingSpace.setRatePerHour(parkingSpace.getRatePerHour());
 			parkingSpace.setAvailabilityStatus("available");
 
 			return parkingSpaceRepository.save(parkingSpace);
@@ -124,8 +127,8 @@ public class ParkingSpaceService {
 			List<ParkingSpace> parkingSpaces = parkingSpaceRequests.stream().map(request -> {
 				ParkingSpace parkingSpace = new ParkingSpace();
 				parkingSpace.setLocation(request.getLocation());
-				parkingSpace.setType(request.getType());
-				parkingSpace.setRate(request.getRate());
+				parkingSpace.setSlotType(request.getSlotType());
+				parkingSpace.setRatePerHour(request.getRatePerHour());
 				parkingSpace.setAvailabilityStatus("available");
 				return parkingSpace;
 			}).collect(Collectors.toList());
@@ -158,9 +161,9 @@ public class ParkingSpaceService {
 			if (location != null)
 				parkingSpace.setLocation(location);
 			if (type != null)
-				parkingSpace.setType(type);
+				parkingSpace.setSlotType(SlotType.valueOf(type.toUpperCase()));
 			if (rate != null)
-				parkingSpace.setRate(rate);
+				parkingSpace.setRatePerHour(BigDecimal.valueOf(rate));
 			if (availabilityStatus != null)
 				parkingSpace.setAvailabilityStatus(availabilityStatus ? "available" : "occupied");
 

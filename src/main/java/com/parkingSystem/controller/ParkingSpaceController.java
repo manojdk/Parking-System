@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parkingSystem.model.ParkingSpace;
-import com.parkingSystem.service.ParkingSpaceService;
+import com.parkingSystem.service.IParkingSpaceService;
 
 import lombok.AllArgsConstructor;
 
@@ -25,7 +25,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class ParkingSpaceController {
 
-	private ParkingSpaceService parkingSpaceService;
+	private IParkingSpaceService parkingSpaceService;
 
 	@GetMapping(value = "/all/details")
 	public ResponseEntity<Object> getAllParkingSpaces() {

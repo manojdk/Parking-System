@@ -1,4 +1,4 @@
-package com.parkingSystem.service;
+package com.parkingSystem.service.impl;
 
 import java.sql.Date;
 import java.time.LocalDateTime;
@@ -9,10 +9,12 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.UserRepository;
+import com.parkingSystem.service.IUserService;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -22,10 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional
 @AllArgsConstructor
 @Slf4j
-public class UserService {
+public class UserServiceImpl implements IUserService {
 
 	private UserRepository userRepository;
 
+	private PasswordEncoder passwordEncoder;
 
 	/**
 	 * Register new user
@@ -50,7 +53,7 @@ public class UserService {
 			User user = new User();
 			user.setUserName(userName);
 			user.setUserEmail(email);
-			user.setPassword(password);
+			user.setPassword(passwordEncoder.encode(password));
 			user.setLicencePlate(licensePlate);
 			user.setCreatedDate(LocalDateTime.now());
 			user.setRegistrationDate(new Date(System.currentTimeMillis()));
@@ -122,7 +125,7 @@ public class UserService {
 			if (userEmail != null)
 				user.setUserEmail(userEmail);
 			if (password != null)
-				user.setPassword(password);
+				user.setPassword(passwordEncoder.encode(password));
 			if (licensePlate != null)
 				user.setLicencePlate(licensePlate);
 
@@ -158,6 +161,66 @@ public class UserService {
 			return Optional.ofNullable(userRepository.findByUserNameAndUserEmail(username, userEmail));
 		} catch (DataAccessException e) {
 			throw new RuntimeException("Database error occurred while fetching user by Name" + e.getMessage());
+		}
+	}
+
+	public User getUserByUsername(String username) {
+		return userRepository.findByUserName(username)
+				.orElseThrow(() -> new IllegalArgumentException("User not found"));
+	}
+
+	/**
+	 * Get user by email
+	 */
+	public Optional<User> getUserByEmail(String email) {
+		try {
+			return userRepository.findByUserEmail(email);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while fetching user by email: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Get all users
+	 */
+	public List<User> getAllUsers() {
+		try {
+			return userRepository.findAll();
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while fetching all users: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Delete user
+	 */
+	public void deleteUser(Long userId) {
+		try {
+			userRepository.deleteById(userId);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while deleting user: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Check if user exists by username
+	 */
+	public boolean existsByUserName(String userName) {
+		try {
+			return userRepository.existsByUserName(userName);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while checking username existence: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Check if user exists by email
+	 */
+	public boolean existsByUserEmail(String email) {
+		try {
+			return userRepository.existsByUserEmail(email);
+		} catch (DataAccessException e) {
+			throw new RuntimeException("Database error occurred while checking email existence: " + e.getMessage());
 		}
 	}
 

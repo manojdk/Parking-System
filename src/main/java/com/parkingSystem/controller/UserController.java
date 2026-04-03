@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parkingSystem.model.User;
-import com.parkingSystem.service.UserService;
+import com.parkingSystem.service.IUserService;
 
 import lombok.AllArgsConstructor;
 
@@ -25,7 +25,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class UserController {
 
-	private UserService userService;
+	private IUserService userService;
 
 	@PostMapping("/register")
 	public ResponseEntity<Object> registerUser(@RequestBody Map<String, String> request) {

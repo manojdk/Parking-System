@@ -41,6 +41,9 @@ public class User {
     @NotBlank(message = "License plate is mandatory")
 	private String licencePlate;
 
+	@Column(name = "role", nullable = false)
+	private String role = "USER"; // Default role
+
 	@Column(name = "created_date", nullable = false)
 	private LocalDateTime createdDate;
 

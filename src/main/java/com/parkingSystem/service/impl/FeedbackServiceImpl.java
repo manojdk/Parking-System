@@ -1,4 +1,4 @@
-package com.parkingSystem.service;
+package com.parkingSystem.service.impl;
 
 import java.util.List;
 
@@ -11,13 +11,14 @@ import com.parkingSystem.model.User;
 import com.parkingSystem.repository.FeedbackRepository;
 import com.parkingSystem.repository.ReservationRepository;
 import com.parkingSystem.repository.UserRepository;
+import com.parkingSystem.service.IFeedbackService;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 
 @Service
 @AllArgsConstructor
-public class FeedbackService {
+public class FeedbackServiceImpl implements IFeedbackService {
 
 	private FeedbackRepository feedbackRepository;
 
