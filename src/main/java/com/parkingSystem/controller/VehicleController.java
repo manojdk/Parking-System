@@ -1,10 +1,9 @@
 package com.parkingSystem.controller;
 
-import com.parkingSystem.service.VehicleService;
-import com.parkingSystem.model.Vehicle;
-import com.parkingSystem.dto.VehicleRegistrationRequest;
 import com.parkingSystem.dto.VehicleDTO;
-import com.parkingSystem.enums.VehicleType;
+import com.parkingSystem.dto.VehicleRegistrationRequest;
+import com.parkingSystem.model.Vehicle;
+import com.parkingSystem.service.IVehicleService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class VehicleController {
 
-    private VehicleService vehicleService;
+    private IVehicleService vehicleService;
 
     /**
      * Register a new vehicle

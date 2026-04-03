@@ -1,18 +1,25 @@
 package com.parkingSystem.service.impl;
 
-import com.parkingSystem.model.*;
-import com.parkingSystem.repository.ParkingTicketRepository;
 import com.parkingSystem.enums.TicketStatus;
+import com.parkingSystem.model.ParkingSpace;
+import com.parkingSystem.model.ParkingTicket;
+import com.parkingSystem.model.User;
+import com.parkingSystem.model.Vehicle;
+import com.parkingSystem.repository.ParkingTicketRepository;
+import com.parkingSystem.service.IBillingService;
+import com.parkingSystem.service.IParkingEntryExitService;
+import com.parkingSystem.service.IUserService;
+import com.parkingSystem.service.IVehicleService;
 import com.parkingSystem.uuidTest.ParkingSpaceRepository;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
+
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 import java.util.List;
-import com.parkingSystem.service.IVehicleService;
+import java.util.Optional;
 
 /**
  * Service for managing vehicle entry and exit in parking system
@@ -20,12 +27,13 @@ import com.parkingSystem.service.IVehicleService;
 @Service
 @AllArgsConstructor
 @Slf4j
-public class ParkingEntryExitServiceImpl implements com.parkingSystem.service.IParkingEntryExitService {
+public class ParkingEntryExitServiceImpl implements IParkingEntryExitService {
 
     private ParkingTicketRepository parkingTicketRepository;
     private ParkingSpaceRepository parkingSpaceRepository;
     private IVehicleService vehicleService;
     private IUserService userService;
+    private IBillingService billingService;
 
     /**
      * Record vehicle entry into parking
@@ -111,6 +119,15 @@ public class ParkingEntryExitServiceImpl implements com.parkingSystem.service.IP
             ParkingSpace parkingSpace = ticket.getParkingSpace();
             parkingSpace.setAvailabilityStatus("available");
             parkingSpaceRepository.save(parkingSpace);
+
+            // Generate bill for the closed ticket
+            try {
+                billingService.generateBill(updatedTicket.getTicketId());
+            } catch (Exception e) {
+                log.error("Error generating bill for ticket {}: {}", ticketReference, e.getMessage());
+                // We don't necessarily want to fail the exit process if billing fails, 
+                // but in a real system this would need careful handling.
+            }
 
             log.info("Vehicle exit recorded successfully. Parking duration: {} minutes", durationMinutes);
             return updatedTicket;

@@ -1,8 +1,9 @@
 package com.parkingSystem.controller;
 
-import com.parkingSystem.service.SlotAllocationService;
-import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.enums.SlotType;
+import com.parkingSystem.model.ParkingSpace;
+import com.parkingSystem.service.ISlotAllocationService;
+import com.parkingSystem.service.impl.SlotAllocationServiceImpl;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ import java.util.Map;
 @Slf4j
 public class SlotAllocationController {
 
-    private SlotAllocationService slotAllocationService;
+    private ISlotAllocationService slotAllocationService;
 
     /**
      * Find nearest available slot by location and type
@@ -124,7 +125,7 @@ public class SlotAllocationController {
     public ResponseEntity<?> getAvailabilitySummary() {
         try {
             log.info("Fetching availability summary");
-            SlotAllocationService.AvailabilitySummary summary = slotAllocationService.getAvailabilitySummary();
+            SlotAllocationServiceImpl.AvailabilitySummary summary = slotAllocationService.getAvailabilitySummary();
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "success");

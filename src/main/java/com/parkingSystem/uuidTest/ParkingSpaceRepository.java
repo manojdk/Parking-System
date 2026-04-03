@@ -48,7 +48,7 @@ public interface ParkingSpaceRepository extends JpaRepository<ParkingSpace, Long
 	Long countAllAvailable();
 
 	List<ParkingSpace> findByIsActiveTrueOrderByFloorNumber();
+
+	@Query("SELECT p FROM ParkingSpace p WHERE p.location = :location AND p.slotType = :slotType AND p.availabilityStatus = 'available' AND p.isActive = true ORDER BY p.floorNumber ASC")
+    List<ParkingSpace> findNearestAvailableSlots(@Param("location") String location, @Param("slotType") SlotType slotType);
 }
-
-
-

@@ -2,6 +2,8 @@ package com.parkingSystem.service;
 
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.enums.SlotType;
+import com.parkingSystem.service.impl.SlotAllocationServiceImpl;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -33,7 +35,7 @@ public interface ISlotAllocationService {
     /**
      * Get availability summary
      */
-    AvailabilitySummary getAvailabilitySummary();
+    SlotAllocationServiceImpl.AvailabilitySummary getAvailabilitySummary();
 
     /**
      * Recommend slot based on vehicle type
