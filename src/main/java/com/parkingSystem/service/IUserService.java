@@ -1,8 +1,9 @@
 package com.parkingSystem.service;
 
+import com.parkingSystem.dto.UserDetailsDTO;
+
 import com.parkingSystem.model.User;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -27,7 +28,7 @@ public interface IUserService {
      * @param userId User ID
      * @return User data
      */
-    Map<String, Object> getUserDetails(Long userId);
+    UserDetailsDTO getUserDetails(Long userId);
 
     /**
      * Update user data

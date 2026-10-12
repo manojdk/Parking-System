@@ -1,5 +1,7 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.model.Reservation;
 import java.util.List;
 
@@ -17,7 +19,7 @@ public interface IReservationService {
      *
      * @return Reservation data
      */
-    List<Reservation> getAllReservations();
+    Page<Reservation> getAllReservations(Pageable pageable);
 
     /**
      * Reserve an AVAILABLE space for the user. A user can hold only one active reservation at a time.
@@ -75,5 +77,5 @@ public interface IReservationService {
      * @param userId User ID
      * @return List of reservations
      */
-    List<Reservation> getReservationsByUserId(Long userId);
+    Page<Reservation> getReservationsByUserId(Long userId, Pageable pageable);
 }

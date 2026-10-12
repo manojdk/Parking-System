@@ -1,5 +1,8 @@
 package com.parkingSystem.controller;
 
+import org.springframework.data.domain.Sort;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import com.parkingSystem.dto.CreateFeedbackRequest;
 import com.parkingSystem.dto.FeedbackDTO;
 import com.parkingSystem.dto.UpdateFeedbackRequest;
@@ -23,6 +26,8 @@ import java.util.Map;
 @AllArgsConstructor
 public class FeedbackController {
 
+	private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "feedbackId");
+
 	private IFeedbackService feedbackService;
 
 	private IReservationService reservationService;
@@ -31,9 +36,11 @@ public class FeedbackController {
 
 	@GetMapping("/all/details")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Object> getAllFeedback() {
-		List<FeedbackDTO> feedBacks = feedbackService.getAllFeedback().stream().map(FeedbackDTO::from).toList();
-		return ResponseEntity.ok(feedBacks);
+	public PageResponse<FeedbackDTO> getAllFeedback(
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+		return PageResponse.of(feedbackService.getAllFeedback(Pagination.of(page, size, NEWEST_FIRST)),
+				FeedbackDTO::from);
 	}
 
 	@GetMapping("/details")
@@ -86,11 +93,12 @@ public class FeedbackController {
 	}
 
 	@GetMapping("/details/user")
-	public ResponseEntity<Object> getFeedbacksByUserId(@RequestParam Long userId) {
+	public PageResponse<FeedbackDTO> getFeedbacksByUserId(@RequestParam Long userId,
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
 		currentUserService.checkAccess(userId);
-		List<FeedbackDTO> feedbacks = feedbackService.getFeedbacksByUserId(userId).stream()
-				.map(FeedbackDTO::from).toList();
-		return ResponseEntity.ok(feedbacks);
+		return PageResponse.of(feedbackService.getFeedbacksByUserId(userId, Pagination.of(page, size, NEWEST_FIRST)),
+				FeedbackDTO::from);
 	}
 
 	@GetMapping("/details/reservation")

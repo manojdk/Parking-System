@@ -88,6 +88,13 @@ public abstract class IntegrationTestSupport {
         return new Session(longAt(result, "$.userId"), JsonPath.read(body(result), "$.token"));
     }
 
+    /** A registered user who owns a car, so they can reserve and park in normal spaces. */
+    protected Session driver() throws Exception {
+        Session session = registerAndLogin();
+        registerVehicle(session);
+        return session;
+    }
+
     protected String createAdmin() {
         String name = uniqueName();
         User admin = new User();
@@ -102,19 +109,27 @@ public abstract class IntegrationTestSupport {
     }
 
     protected Long registerVehicle(Session owner) throws Exception {
+        return registerVehicle(owner, "CAR");
+    }
+
+    protected Long registerVehicle(Session owner, String vehicleType) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/vehicles/register").header("Authorization", owner.bearer())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"licensePlate\":\"" + uniqueName() + "\",\"vehicleType\":\"CAR\"}"))
+                        .content("{\"licensePlate\":\"" + uniqueName() + "\",\"vehicleType\":\"" + vehicleType + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         return longAt(result, "$.vehicle.vehicleId");
     }
 
     protected Long createSpace(String adminBearer) throws Exception {
+        return createSpace(adminBearer, "North", "NORMAL", 0);
+    }
+
+    protected Long createSpace(String adminBearer, String location, String slotType, int floor) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/parkingspace/register").header("Authorization", adminBearer)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"spaceNumber\":\"" + uniqueName() + "\",\"location\":\"North\",\"floorNumber\":0,"
-                                + "\"slotType\":\"NORMAL\",\"ratePerHour\":10.00}"))
+                        .content("{\"spaceNumber\":\"" + uniqueName() + "\",\"location\":\"" + location + "\","
+                                + "\"floorNumber\":" + floor + ",\"slotType\":\"" + slotType + "\",\"ratePerHour\":10.00}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         return longAt(result, "$.parkingSpaceId");

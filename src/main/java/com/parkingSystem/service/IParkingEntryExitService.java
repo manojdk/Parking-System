@@ -1,5 +1,7 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.model.ParkingTicket;
 import java.util.List;
 import java.util.Optional;
@@ -27,12 +29,12 @@ public interface IParkingEntryExitService {
     /**
      * Get all active tickets (vehicles currently parked)
      */
-    List<ParkingTicket> getActiveTickets();
+    Page<ParkingTicket> getActiveTickets(Pageable pageable);
 
     /**
      * Get user's parking history
      */
-    List<ParkingTicket> getUserParkingHistory(Long userId);
+    Page<ParkingTicket> getUserParkingHistory(Long userId, Pageable pageable);
 
     /**
      * Get user's current active parking sessions

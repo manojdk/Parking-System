@@ -1,5 +1,7 @@
 package com.parkingSystem.service.impl;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -24,6 +26,7 @@ import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.ParkingSpaceRepository;
 import com.parkingSystem.repository.ReservationRepository;
+import com.parkingSystem.repository.VehicleRepository;
 import com.parkingSystem.service.IReservationService;
 import com.parkingSystem.service.IUserService;
 
@@ -45,11 +48,13 @@ public class ReservationServiceImpl implements IReservationService {
 	private final ReservationRepository reservationRepository;
 	private final ParkingSpaceRepository parkingSpaceRepository;
 	private final IUserService userService;
+	private final VehicleRepository vehicleRepository;
 	private final Clock clock;
 	private final Duration holdTime;
 
 	public ReservationServiceImpl(ReservationRepository reservationRepository,
-			ParkingSpaceRepository parkingSpaceRepository, IUserService userService, Clock clock,
+			ParkingSpaceRepository parkingSpaceRepository, IUserService userService,
+			VehicleRepository vehicleRepository, Clock clock,
 			@Value("${app.reservation.hold-minutes:30}") long holdMinutes) {
 		if (holdMinutes <= 0) {
 			throw new IllegalStateException("app.reservation.hold-minutes must be positive, was " + holdMinutes);
@@ -57,6 +62,7 @@ public class ReservationServiceImpl implements IReservationService {
 		this.reservationRepository = reservationRepository;
 		this.parkingSpaceRepository = parkingSpaceRepository;
 		this.userService = userService;
+		this.vehicleRepository = vehicleRepository;
 		this.clock = clock;
 		this.holdTime = Duration.ofMinutes(holdMinutes);
 	}
@@ -66,8 +72,8 @@ public class ReservationServiceImpl implements IReservationService {
 	 *
 	 * @return Reservation data
 	 */
-	public List<Reservation> getAllReservations() {
-		return reservationRepository.findAll();
+	public Page<Reservation> getAllReservations(Pageable pageable) {
+		return reservationRepository.findAll(pageable);
 	}
 
 	/**
@@ -97,6 +103,7 @@ public class ReservationServiceImpl implements IReservationService {
 			}
 		}
 		requireInService(parkingSpace);
+		requireFittingVehicle(userId, parkingSpace);
 		if (parkingSpace.getAvailabilityStatus() != SpaceStatus.AVAILABLE) {
 			throw new ConflictException("Parking space is not available. Current status: "
 					+ parkingSpace.getAvailabilityStatus());
@@ -133,6 +140,7 @@ public class ReservationServiceImpl implements IReservationService {
 			ParkingSpace currentSpace = spaces.get(currentSpaceId);
 			ParkingSpace newSpace = spaces.get(parkingSpaceId);
 			requireInService(newSpace);
+			requireFittingVehicle(reservation.getUser().getUserId(), newSpace);
 			if (newSpace.getAvailabilityStatus() != SpaceStatus.AVAILABLE) {
 				throw new ConflictException("Parking space is not available. Current status: "
 						+ newSpace.getAvailabilityStatus());
@@ -209,8 +217,8 @@ public class ReservationServiceImpl implements IReservationService {
 	 * @param userId
 	 * @return Reservation data
 	 */
-	public List<Reservation> getReservationsByUserId(Long userId) {
-		return reservationRepository.findAllByUserUserId(userId);
+	public Page<Reservation> getReservationsByUserId(Long userId, Pageable pageable) {
+		return reservationRepository.findAllByUserUserId(userId, pageable);
 	}
 
 	// ------------------------------------------------------------------ helpers
@@ -249,6 +257,19 @@ public class ReservationServiceImpl implements IReservationService {
 		}
 		if (reservation.isHoldOver(now())) {
 			throw new ConflictException("Reservation has expired at " + reservation.getExpiresAt());
+		}
+	}
+
+	/**
+	 * A reservation is only useful if the driver can actually park there: they need an active vehicle that the
+	 * space's slot type accepts (for example an EV for a charging bay).
+	 */
+	private void requireFittingVehicle(Long userId, ParkingSpace parkingSpace) {
+		boolean fits = vehicleRepository.findByUserUserIdAndIsActiveTrue(userId).stream()
+				.anyMatch(vehicle -> parkingSpace.getSlotType().accepts(vehicle.getVehicleType()));
+		if (!fits) {
+			throw new BadRequestException("You have no registered vehicle that can park in a "
+					+ parkingSpace.getSlotType() + " space");
 		}
 	}
 

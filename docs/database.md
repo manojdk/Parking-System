@@ -14,6 +14,7 @@ checks that the migrations apply cleanly.
 | V3 | `V3__one_active_ticket_per_space_and_vehicle.sql` | Database guarantee: at most one ACTIVE ticket per space and per vehicle |
 | V4 | `V4__reservation_lifecycle.sql` | Reservation status, hold expiry, link to the ticket; legacy reservations closed as EXPIRED |
 | V5 | `V5__payments.sql` | Online payment attempts with idempotency keys and a one-payment-in-progress guard |
+| V6 | `V6__bike_and_ev_charging_slots.sql` | Slot types `EV_CHARGING` and `BIKE` (check constraint rebuilt) |
 
 **Existing databases.** A database created by an older version of the app (`ddl-auto=update`) is adopted as
 version 1 (`spring.flyway.baseline-on-migrate=true`) and gets V2-V4 on the next start. If V3 fails, that database
@@ -84,7 +85,7 @@ these constraints are the safety net, and a violation is returned as a 409.
 | space_number | unique, not null |
 | availability_status | `AVAILABLE`, `RESERVED`, `OCCUPIED`, `OUT_OF_SERVICE` (check constraint) |
 | location, floor_number | |
-| slot_type | `NORMAL`, `VIP`, `HANDICAPPED` |
+| slot_type | `NORMAL`, `VIP`, `HANDICAPPED`, `EV_CHARGING`, `BIKE` |
 | rate_per_hour | decimal, not null |
 | is_active | false = removed by an admin but kept because tickets or reservations refer to it |
 | notes, created_at, updated_at | |

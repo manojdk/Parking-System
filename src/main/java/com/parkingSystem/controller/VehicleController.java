@@ -1,5 +1,8 @@
 package com.parkingSystem.controller;
 
+import org.springframework.data.domain.Sort;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import com.parkingSystem.dto.VehicleDTO;
 import com.parkingSystem.dto.VehicleRegistrationRequest;
 import com.parkingSystem.exception.ResourceNotFoundException;
@@ -15,9 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Controller for Vehicle management
@@ -27,6 +28,8 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Slf4j
 public class VehicleController {
+
+    private static final Sort BY_ID = Sort.by("vehicleId");
 
     private IVehicleService vehicleService;
     private CurrentUserService currentUserService;
@@ -78,16 +81,12 @@ public class VehicleController {
      * Get all vehicles for a user
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserVehicles(@PathVariable Long userId) {
+    public PageResponse<VehicleDTO> getUserVehicles(@PathVariable Long userId,
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
         currentUserService.checkAccess(userId);
-        List<Vehicle> vehicles = vehicleService.getUserVehicles(userId);
-        List<VehicleDTO> dtos = vehicles.stream().map(this::convertToDTO).collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("count", vehicles.size());
-        response.put("vehicles", dtos);
-        return ResponseEntity.ok(response);
+        return PageResponse.of(vehicleService.getUserVehicles(userId, Pagination.of(page, size, BY_ID)),
+                this::convertToDTO);
     }
 
     /**
@@ -122,15 +121,11 @@ public class VehicleController {
      */
     @GetMapping("/all/active")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllActiveVehicles() {
-        List<Vehicle> vehicles = vehicleService.getAllActiveVehicles();
-        List<VehicleDTO> dtos = vehicles.stream().map(this::convertToDTO).collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("count", vehicles.size());
-        response.put("vehicles", dtos);
-        return ResponseEntity.ok(response);
+    public PageResponse<VehicleDTO> getAllActiveVehicles(
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+        return PageResponse.of(vehicleService.getAllActiveVehicles(Pagination.of(page, size, BY_ID)),
+                this::convertToDTO);
     }
 
     /**

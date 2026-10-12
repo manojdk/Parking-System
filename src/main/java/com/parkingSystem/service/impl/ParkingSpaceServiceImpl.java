@@ -1,10 +1,10 @@
 package com.parkingSystem.service.impl;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,8 +38,8 @@ public class ParkingSpaceServiceImpl implements IParkingSpaceService {
 	 * 
 	 * @return Parking space data
 	 */
-	public List<ParkingSpace> getAllParkingSpaces() {
-		return parkingSpaceRepository.findAll();
+	public Page<ParkingSpace> getAllParkingSpaces(Pageable pageable) {
+		return parkingSpaceRepository.findAll(pageable);
 	}
 
 	/**
@@ -58,8 +58,8 @@ public class ParkingSpaceServiceImpl implements IParkingSpaceService {
 	 * @param availabilityStatus status to filter on
 	 * @return Parking space data
 	 */
-	public List<ParkingSpace> getAvailableParkingSpaces(SpaceStatus availabilityStatus) {
-		return parkingSpaceRepository.findByAvailabilityStatusAndIsActiveTrue(availabilityStatus);
+	public Page<ParkingSpace> getAvailableParkingSpaces(SpaceStatus availabilityStatus, Pageable pageable) {
+		return parkingSpaceRepository.findByAvailabilityStatusAndIsActiveTrue(availabilityStatus, pageable);
 	}
 
 	/**
@@ -68,21 +68,9 @@ public class ParkingSpaceServiceImpl implements IParkingSpaceService {
 	 * @param parkingSpaceId Parking space ID
 	 * @return Parking space data
 	 */
-	public Map<String, Object> getParkingSpaceDetails(Long parkingSpaceId) {
-		Optional<ParkingSpace> parkingSpaceOptional = getParkingSpaceById(parkingSpaceId);
-		if (parkingSpaceOptional.isEmpty()) {
-			throw new ResourceNotFoundException("Parking space not found with id: " + parkingSpaceId);
-		}
-
-		ParkingSpace parkingSpace = parkingSpaceOptional.get();
-		Map<String, Object> parkingSpaceDetails = new HashMap<>();
-		parkingSpaceDetails.put("parkingSpaceId", parkingSpace.getParkingSpaceId());
-		parkingSpaceDetails.put("location", parkingSpace.getLocation());
-		parkingSpaceDetails.put("type", parkingSpace.getSlotType());
-		parkingSpaceDetails.put("rate", parkingSpace.getRatePerHour());
-		parkingSpaceDetails.put("availabilityStatus", parkingSpace.getAvailabilityStatus());
-
-		return parkingSpaceDetails;
+	public ParkingSpace getParkingSpaceDetails(Long parkingSpaceId) {
+		return getParkingSpaceById(parkingSpaceId)
+				.orElseThrow(() -> new ResourceNotFoundException("Parking space not found with id: " + parkingSpaceId));
 	}
 
 	/**

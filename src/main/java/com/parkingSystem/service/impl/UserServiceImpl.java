@@ -1,11 +1,9 @@
 package com.parkingSystem.service.impl;
 
+import com.parkingSystem.dto.UserDetailsDTO;
 import java.sql.Date;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -67,23 +65,10 @@ public class UserServiceImpl implements IUserService {
 	 * @param userId User ID
 	 * @return User data
 	 */
-	public Map<String, Object> getUserDetails(Long userId) {
+	public UserDetailsDTO getUserDetails(Long userId) {
 		User user = getUserById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
-
-		Map<String, Object> profile = new HashMap<>();
-		profile.put("licensePlate", user.getLicencePlate());
-		profile.put("createdDate", user.getCreatedDate());
-
-		Map<String, Object> userProfile = new LinkedHashMap<>();
-		userProfile.put("userId", user.getUserId());
-		userProfile.put("userName", user.getUserName());
-		userProfile.put("userEmail", user.getUserEmail());
-		userProfile.put("role", user.getRole());
-		userProfile.put("registrationDate", user.getRegistrationDate());
-		userProfile.put("profile", profile);
-
-		return userProfile;
+		return UserDetailsDTO.from(user);
 	}
 
 	/**

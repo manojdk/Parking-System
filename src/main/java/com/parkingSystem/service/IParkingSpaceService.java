@@ -1,11 +1,12 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.enums.SpaceStatus;
 import com.parkingSystem.model.ParkingSpace;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -18,7 +19,7 @@ public interface IParkingSpaceService {
      *
      * @return Parking space data
      */
-    List<ParkingSpace> getAllParkingSpaces();
+    Page<ParkingSpace> getAllParkingSpaces(Pageable pageable);
 
     /**
      * Get Parking space detail by parkingSpaceId (helper class)
@@ -34,7 +35,7 @@ public interface IParkingSpaceService {
      * @param availabilityStatus status to filter on
      * @return Parking space data
      */
-    List<ParkingSpace> getAvailableParkingSpaces(SpaceStatus availabilityStatus);
+    Page<ParkingSpace> getAvailableParkingSpaces(SpaceStatus availabilityStatus, Pageable pageable);
 
     /**
      * Get Parking Space detail by parkingSpaceId
@@ -42,7 +43,7 @@ public interface IParkingSpaceService {
      * @param parkingSpaceId Parking space ID
      * @return Parking space data
      */
-    Map<String, Object> getParkingSpaceDetails(Long parkingSpaceId);
+    ParkingSpace getParkingSpaceDetails(Long parkingSpaceId);
 
     /**
      * Adding Parking space

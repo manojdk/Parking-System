@@ -12,21 +12,25 @@ This is a personal learning/portfolio project. It is not deployed anywhere and i
 - **Ownership rules** - a user can only read or change their own profile, vehicles, tickets, bills, reservations
   and feedback. Admins can access everything.
 - **Parking spaces** (admin) - create one or many, update, remove. Each space has a type (`NORMAL`, `VIP`,
-  `HANDICAPPED`), location, floor, hourly rate and a status: `AVAILABLE`, `RESERVED`, `OCCUPIED` or
+  `HANDICAPPED`, `EV_CHARGING`, `BIKE`), location, floor, hourly rate and a status: `AVAILABLE`, `RESERVED`, `OCCUPIED` or
   `OUT_OF_SERVICE`. Admins can only take a space out of service (or back) while nobody is using it; a space with
   history is deactivated instead of deleted.
-- **Public availability lookup** - anonymous visitors can see free spaces, an availability summary, current
-  occupancy, and get the nearest free slot for a location and type.
-- **Vehicles** - register (`CAR`, `BIKE`, `EV`), update, deactivate.
+- **Public availability lookup** - anonymous visitors can see free spaces, free spaces per slot type, current
+  occupancy, the nearest free slot for a location and type, and a recommendation for their vehicle (an EV gets a
+  charging bay first, then a normal one).
+- **Vehicles** - register (`CAR`, `BIKE`, `EV`), update, deactivate. A vehicle only parks in slots it fits: bikes in
+  `BIKE` bays, only EVs in `EV_CHARGING` bays, cars and EVs in the others. Reserving a space needs a vehicle that
+  fits it.
 - **Entry / exit** - entry creates an `ACTIVE` ticket and marks the space occupied; exit closes the ticket,
   frees the space and generates the bill in the same transaction. Active tickets can be cancelled. A reserved
   space admits only the driver who reserved it.
 - **Safe under concurrent requests** - two cars (or a car and a reservation) can never get the same space: writes
   lock the space row, and unique constraints in the database back that up. Proven by a test that fires
   simultaneous requests at one space.
-- **Billing** - hourly pricing (every started hour counts, minimum one hour) plus 10% tax, one bill per ticket,
-  UUID-based invoice numbers. Admins can also bill with slab pricing (100% / 90% / 80% / 70% by duration band),
-  apply discounts, record cash payments and see pending bills and total revenue.
+- **Billing** - one bill per ticket, created on exit, with UUID-based invoice numbers. **Configurable pricing**:
+  hourly or slab mode (bands with decreasing rates), tax rate, an optional grace period (short stays are free) and
+  an optional daily cap. The defaults are hourly, every started hour, minimum one hour, plus 10% tax. Admins apply
+  discounts, record cash payments and see pending bills and total revenue (summed by the database).
 - **Online payments** - users pay through a payment provider (a mock one here). Starting a payment needs an
   `Idempotency-Key`, so a retried request never charges twice; the bill becomes PAID only when the provider
   confirms through an HMAC-signed, timestamped webhook. Covers duplicate webhooks, failed and timed-out
@@ -36,6 +40,8 @@ This is a personal learning/portfolio project. It is not deployed anywhere and i
   drives in, can be moved or cancelled, and expires on a no-show (a scheduled job frees the space; an overdue hold
   never blocks anyone even before the job runs). One active reservation per user.
 - **Feedback** - a 1-5 rating for a reservation that was actually used, once per reservation.
+- **Paginated lists** - every list that can grow returns one page shape `{content, page, size, totalElements,
+  totalPages, last}` with a stable order; all responses are DTOs, never JPA entities.
 - **Consistent errors** - every error is JSON: `{timestamp, status, error, message, path}`. Unexpected errors
   return a generic 500 without internal details.
 - **OpenAPI** - interactive docs at `/swagger-ui.html`.
@@ -103,6 +109,10 @@ All secrets come from environment variables. Copy `.env.example` to `.env` and f
 | `PAYMENT_WEBHOOK_SECRET` | yes | HMAC key shared with the payment provider for webhook signatures, at least 32 characters |
 | `PAYMENT_TIMEOUT_MINUTES` | no | how long a payment may wait for the provider's confirmation, default 15 |
 | `PAYMENT_MOCK_ENABLED` | no | serve the mock provider's checkout endpoints, default `true`; set `false` with a real provider |
+| `PRICING_MODE` | no | `HOURLY` (default) or `SLAB`, for the bill created on exit |
+| `PRICING_TAX_RATE` | no | tax as a fraction of the base amount, default `0.10` |
+| `PRICING_GRACE_PERIOD_MINUTES` | no | stays this short are free, default `0` (off) |
+| `PRICING_DAILY_CAP_HOURS` | no | most hours charged per started 24 hours, default `0` (off) |
 | `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | no | if all three are set, an `ADMIN` account is created on startup (skipped if it already exists) |
 
 There is no separate admin sign-up: set the three `ADMIN_*` variables to get the first admin account.
@@ -167,6 +177,16 @@ curl localhost:8080/api/slots/availability-summary
 Where a request body has an optional `userId` (vehicle registration, entry, reservation, feedback), it defaults to
 the logged-in user.
 
+**Lists** take `?page=0&size=20` (size 1-100) and return
+
+```json
+{"content": [ ... ], "page": 0, "size": 20, "totalElements": 57, "totalPages": 3, "last": false}
+```
+
+Each list has a fixed, total sort order (for example bills newest first, spaces by floor then number), so pages
+never overlap or skip items. Short, bounded lists (a user's currently parked vehicles, payments of one bill,
+feedback of one reservation) are plain arrays.
+
 ## Security model
 
 - **Authentication**: `POST /api/auth/login` returns an HS256-signed JWT containing the username and role. Send it as
@@ -206,6 +226,12 @@ secret. Time-based rules use an injected `Clock`, so tests move time forward ins
 - **Payments** (`PaymentIntegrationTest`, `WebhookSignerTest`): idempotent retries, only the webhook settles the bill,
   ownership, one payment at a time and timeouts, failed payments, late confirmations flagged for refund, webhook
   signature / replay / duplicate / conflicting deliveries, and admin actions blocked during an online payment.
+- **Pricing** (`PricingCalculatorTest`, `PricingConfigurationIntegrationTest`): the default prices, tax rounding,
+  grace period, daily cap (hourly and slab), custom slabs, invalid settings rejected at startup, and settings
+  changing the bill created on exit.
+- **API shape and slot rules** (`ApiShapeAndSlotRulesIntegrationTest`): pages without overlap or gaps, page
+  parameter validation, DTO responses, revenue sum, which vehicle fits which slot, reservations needing a fitting
+  vehicle, and vehicle-aware recommendations.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `./mvnw -B verify` on JDK 17 for every push and pull request,
 twice: once on H2 and once against a real PostgreSQL 16 service container, so the migrations, row locks and
@@ -216,13 +242,10 @@ constraints are also proven on the production database engine.
 Known gaps, kept here deliberately rather than hidden:
 
 - Reservations hold a space from now; booking a space for a later time slot is not supported.
-- Tax (10%) and slab percentages are hard-coded.
 - Payments use a mock provider; refunds flagged `REFUND_REQUIRED` are not processed automatically, and timed-out
   payments are expired lazily (on the next attempt or confirmation), not by a job.
-- Some responses (parking spaces, slots) still return JPA entities instead of response DTOs.
 - JWTs are bound to the username and cannot be revoked; changing your user name requires logging in again.
-- `GET /api/slots/recommend` ignores the vehicle type and returns the nearest `NORMAL` slot.
-- List endpoints are not paginated.
+- VIP and HANDICAPPED bays accept any car or EV: there is no membership or permit model to check against.
 
 ## Roadmap
 

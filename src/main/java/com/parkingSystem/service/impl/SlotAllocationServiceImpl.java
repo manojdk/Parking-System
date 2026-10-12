@@ -1,99 +1,82 @@
 package com.parkingSystem.service.impl;
 
-import com.parkingSystem.exception.ConflictException;
-import com.parkingSystem.exception.ResourceNotFoundException;
-import com.parkingSystem.model.ParkingSpace;
+import com.parkingSystem.dto.AvailabilitySummaryDTO;
 import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.enums.SpaceStatus;
+import com.parkingSystem.enums.VehicleType;
+import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.repository.ParkingSpaceRepository;
+import com.parkingSystem.service.ISlotAllocationService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
- * Service for intelligent slot allocation
+ * Read-only slot lookups.
  */
 @Service
 @AllArgsConstructor
 @Slf4j
-public class SlotAllocationServiceImpl implements com.parkingSystem.service.ISlotAllocationService {
+public class SlotAllocationServiceImpl implements ISlotAllocationService {
 
     private ParkingSpaceRepository parkingSpaceRepository;
 
-    /**
-     * Find nearest available slot by location and type
-     */
     public Optional<ParkingSpace> findNearestAvailableSlot(String location, SlotType slotType) {
         log.info("Finding nearest available slot at location: {} for type: {}", location, slotType);
         return parkingSpaceRepository.findNearestAvailableSlot(location, slotType);
     }
 
-    /**
-     * Find available slot by type only
-     */
-    public List<ParkingSpace> findAvailableSlotsByType(SlotType slotType) {
-        log.info("Finding available slots for type: {}", slotType);
-        return parkingSpaceRepository.findAvailableBySlotType(slotType);
+    public Page<ParkingSpace> findAvailableSlotsByType(SlotType slotType, Pageable pageable) {
+        return parkingSpaceRepository.findAvailableBySlotType(slotType, pageable);
+    }
+
+    public Page<ParkingSpace> findAvailableSlotsByLocation(String location, Pageable pageable) {
+        return parkingSpaceRepository.findAvailableByLocation(location, pageable);
+    }
+
+    public Page<ParkingSpace> getAllAvailableSlots(Pageable pageable) {
+        return parkingSpaceRepository.findAvailableParkingSpaces(pageable);
     }
 
     /**
-     * Find available slots by location
+     * One grouped query instead of one count per type; every slot type is listed, with 0 when none are free.
      */
-    public List<ParkingSpace> findAvailableSlotsByLocation(String location) {
-        log.info("Finding available slots at location: {}", location);
-        return parkingSpaceRepository.findAvailableByLocation(location);
-    }
-
-    /**
-     * Get all available slots
-     */
-    public List<ParkingSpace> getAllAvailableSlots() {
-        log.info("Fetching all available slots");
-        return parkingSpaceRepository.findAvailableParkingSpaces();
-    }
-
-    /**
-     * Get availability summary
-     */
-    public AvailabilitySummary getAvailabilitySummary() {
-        log.info("Calculating availability summary");
-        Long totalAvailable = parkingSpaceRepository.countAllAvailable();
-        Long normalAvailable = parkingSpaceRepository.countAvailableBySlotType(SlotType.NORMAL);
-        Long vipAvailable = parkingSpaceRepository.countAvailableBySlotType(SlotType.VIP);
-        Long handicappedAvailable = parkingSpaceRepository.countAvailableBySlotType(SlotType.HANDICAPPED);
-
-        return AvailabilitySummary.builder()
-                .totalAvailableSlots(totalAvailable)
-                .normalSlotsAvailable(normalAvailable)
-                .vipSlotsAvailable(vipAvailable)
-                .handicappedSlotsAvailable(handicappedAvailable)
-                .build();
-    }
-
-    /**
-     * Recommend slot based on vehicle type
-     */
-    public Optional<ParkingSpace> recommendSlot(String location, String vehicleType) {
-        log.info("Recommending slot for vehicle type: {}", vehicleType);
-        
-        // EV vehicles can use any slot but prefer if EVCharging slot exists (can be extended)
-        // For now, all vehicle types get normal slot or first available
-        
-        Optional<ParkingSpace> nearestSlot = parkingSpaceRepository.findNearestAvailableSlot(location, SlotType.NORMAL);
-        
-        if (nearestSlot.isEmpty()) {
-            log.warn("No slots available at location: {}", location);
+    public AvailabilitySummaryDTO getAvailabilitySummary() {
+        Map<SlotType, Long> counts = new EnumMap<>(SlotType.class);
+        for (Object[] row : parkingSpaceRepository.countAvailableGroupedBySlotType()) {
+            counts.put((SlotType) row[0], ((Number) row[1]).longValue());
         }
-        
-        return nearestSlot;
+        Map<SlotType, Long> bySlotType = new LinkedHashMap<>();
+        long total = 0;
+        for (SlotType type : SlotType.values()) {
+            long count = counts.getOrDefault(type, 0L);
+            bySlotType.put(type, count);
+            total += count;
+        }
+        return new AvailabilitySummaryDTO(total, bySlotType);
     }
 
-    /**
-     * Check if slot is available
-     */
+    public Optional<ParkingSpace> recommendSlot(String location, VehicleType vehicleType) {
+        log.info("Recommending slot for vehicle type: {} at location: {}", vehicleType, location);
+        for (SlotType slotType : vehicleType.recommendedSlotTypes()) {
+            Optional<ParkingSpace> slot = parkingSpaceRepository.findNearestAvailableSlot(location, slotType);
+            if (slot.isPresent()) {
+                return slot;
+            }
+        }
+        log.info("No suitable slot for {} at location: {}", vehicleType, location);
+        return Optional.empty();
+    }
+
     public boolean isSlotAvailable(Long parkingSpaceId) {
         Optional<ParkingSpace> slot = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId);
         return slot.isPresent() && Boolean.TRUE.equals(slot.get().getIsActive())
@@ -101,90 +84,13 @@ public class SlotAllocationServiceImpl implements com.parkingSystem.service.ISlo
     }
 
     /**
-     * Get slots by priority
+     * Free slots of a type at a location, lowest floor first, then by space number.
      */
     public List<ParkingSpace> getSlotsByPriority(SlotType slotType, String location) {
-        log.info("Getting slots by priority for type: {} at location: {}", slotType, location);
-        // Priority: nearest available, then by type
-        List<ParkingSpace> slots = parkingSpaceRepository.findNearestAvailableSlots(location, slotType);
-        return slots.stream()
-                .sorted((s1, s2) -> {
-                    // Sort by floor number, then space number
-                    int floorCompare = Integer.compare(s1.getFloorNumber() != null ? s1.getFloorNumber() : 0,
-                                                     s2.getFloorNumber() != null ? s2.getFloorNumber() : 0);
-                    if (floorCompare != 0) return floorCompare;
-                    return s1.getSpaceNumber().compareTo(s2.getSpaceNumber());
-                })
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * DTO for availability summary
-     */
-    public static class AvailabilitySummary {
-        public Long totalAvailableSlots;
-        public Long normalSlotsAvailable;
-        public Long vipSlotsAvailable;
-        public Long handicappedSlotsAvailable;
-
-        public AvailabilitySummary(Long totalAvailableSlots, Long normalSlotsAvailable, 
-                                   Long vipSlotsAvailable, Long handicappedSlotsAvailable) {
-            this.totalAvailableSlots = totalAvailableSlots;
-            this.normalSlotsAvailable = normalSlotsAvailable;
-            this.vipSlotsAvailable = vipSlotsAvailable;
-            this.handicappedSlotsAvailable = handicappedSlotsAvailable;
-        }
-
-        public static Builder builder() {
-            return new Builder();
-        }
-
-        public static class Builder {
-            private Long totalAvailableSlots;
-            private Long normalSlotsAvailable;
-            private Long vipSlotsAvailable;
-            private Long handicappedSlotsAvailable;
-
-            public Builder totalAvailableSlots(Long totalAvailableSlots) {
-                this.totalAvailableSlots = totalAvailableSlots;
-                return this;
-            }
-
-            public Builder normalSlotsAvailable(Long normalSlotsAvailable) {
-                this.normalSlotsAvailable = normalSlotsAvailable;
-                return this;
-            }
-
-            public Builder vipSlotsAvailable(Long vipSlotsAvailable) {
-                this.vipSlotsAvailable = vipSlotsAvailable;
-                return this;
-            }
-
-            public Builder handicappedSlotsAvailable(Long handicappedSlotsAvailable) {
-                this.handicappedSlotsAvailable = handicappedSlotsAvailable;
-                return this;
-            }
-
-            public AvailabilitySummary build() {
-                return new AvailabilitySummary(totalAvailableSlots, normalSlotsAvailable, 
-                                              vipSlotsAvailable, handicappedSlotsAvailable);
-            }
-        }
-
-        public Long getTotalAvailableSlots() {
-            return totalAvailableSlots;
-        }
-
-        public Long getNormalSlotsAvailable() {
-            return normalSlotsAvailable;
-        }
-
-        public Long getVipSlotsAvailable() {
-            return vipSlotsAvailable;
-        }
-
-        public Long getHandicappedSlotsAvailable() {
-            return handicappedSlotsAvailable;
-        }
+        return parkingSpaceRepository.findNearestAvailableSlots(location, slotType).stream()
+                .sorted(Comparator
+                        .comparing((ParkingSpace s) -> s.getFloorNumber() != null ? s.getFloorNumber() : 0)
+                        .thenComparing(ParkingSpace::getSpaceNumber))
+                .toList();
     }
 }

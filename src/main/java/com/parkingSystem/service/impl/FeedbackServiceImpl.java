@@ -1,5 +1,7 @@
 package com.parkingSystem.service.impl;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -34,8 +36,8 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * 
 	 * @return Feedback data
 	 */
-	public List<Feedback> getAllFeedback() {
-		return feedbackRepository.findAll();
+	public Page<Feedback> getAllFeedback(Pageable pageable) {
+		return feedbackRepository.findAll(pageable);
 	}
 
 	/**
@@ -117,8 +119,8 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * @param userId
 	 * @return Feedback Data
 	 */
-	public List<Feedback> getFeedbacksByUserId(Long userId) {
-		return feedbackRepository.findAllByUserUserId(userId);
+	public Page<Feedback> getFeedbacksByUserId(Long userId, Pageable pageable) {
+		return feedbackRepository.findAllByUserUserId(userId, pageable);
 	}
 
 	/**
