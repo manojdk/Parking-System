@@ -3,6 +3,8 @@ package com.parkingSystem.model;
 import java.sql.Date;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,15 +25,16 @@ public class User {
 	private Long userId;
 
 	@Column(name = "user_name",unique = true)
-	@NotBlank(message = "User Name is madatory")
+	@NotBlank(message = "User Name is mandatory")
 	private String userName;
 
 	@Column(name = "user_email", unique = true)
-	@NotBlank(message = "Email is madatory")
+	@NotBlank(message = "Email is mandatory")
 	private String userEmail;
 	
+	@JsonIgnore
 	@Column(name = "user_password")
-	@NotBlank(message = "Password is madatory")
+	@NotBlank(message = "Password is mandatory")
 	private String password;
 
 	@Column(name = "registration_date")

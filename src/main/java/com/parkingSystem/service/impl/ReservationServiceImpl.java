@@ -1,159 +1,278 @@
 package com.parkingSystem.service.impl;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.stream.Stream;
 
-import org.springframework.dao.DataAccessException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.parkingSystem.enums.ReservationStatus;
+import com.parkingSystem.enums.SpaceStatus;
+import com.parkingSystem.exception.BadRequestException;
+import com.parkingSystem.exception.ConflictException;
+import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
+import com.parkingSystem.repository.ParkingSpaceRepository;
 import com.parkingSystem.repository.ReservationRepository;
-import com.parkingSystem.uuidTest.ParkingSpaceRepository;
-import com.parkingSystem.service.IParkingSpaceService;
-import com.parkingSystem.service.IUserService;
 import com.parkingSystem.service.IReservationService;
+import com.parkingSystem.service.IUserService;
 
-import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Reservation life cycle.
+ * <p>
+ * Concurrency: every method that changes a reservation first locks the parking-space row(s) involved, in
+ * ascending id order, and only then locks and reads the reservation. Vehicle entry and the expiry job use
+ * the same order (space, then reservation), so two requests touching the same space run one after the other
+ * and cannot deadlock. Ids are looked up with id-only queries before locking, so no entity is read (and
+ * cached) before its lock is held. The unique "active" columns (V4 migration) back this up in the database.
+ */
 @Service
-@AllArgsConstructor
+@Slf4j
 public class ReservationServiceImpl implements IReservationService {
 
-	private ReservationRepository reservationRepository;
+	private final ReservationRepository reservationRepository;
+	private final ParkingSpaceRepository parkingSpaceRepository;
+	private final IUserService userService;
+	private final Clock clock;
+	private final Duration holdTime;
 
-	private ParkingSpaceRepository parkingSpaceRepository;
-
-	private IParkingSpaceService parkingSpaceService;
-
-	private IUserService userService;
+	public ReservationServiceImpl(ReservationRepository reservationRepository,
+			ParkingSpaceRepository parkingSpaceRepository, IUserService userService, Clock clock,
+			@Value("${app.reservation.hold-minutes:30}") long holdMinutes) {
+		if (holdMinutes <= 0) {
+			throw new IllegalStateException("app.reservation.hold-minutes must be positive, was " + holdMinutes);
+		}
+		this.reservationRepository = reservationRepository;
+		this.parkingSpaceRepository = parkingSpaceRepository;
+		this.userService = userService;
+		this.clock = clock;
+		this.holdTime = Duration.ofMinutes(holdMinutes);
+	}
 
 	/**
 	 * Get all Reservation details
-	 * 
+	 *
 	 * @return Reservation data
 	 */
 	public List<Reservation> getAllReservations() {
-		try {
-			return reservationRepository.findAll();
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching all reservations: " + e.getMessage());
-		}
+		return reservationRepository.findAll();
 	}
 
 	/**
-	 * Reserving Parking space for User
-	 * 
-	 * @param userId
-	 * @param parkingSpaceId
-	 * @param reservationTime
-	 * @param durationMinutes
-	 * @return
+	 * Reserve a space. The space must be in service and AVAILABLE, and the user must not already hold an
+	 * active reservation. If the user's previous reservation has run out but the expiry job has not
+	 * processed it yet, it is expired here instead of blocking the new one.
 	 */
-
 	@Transactional
 	public Reservation createReservation(Long userId, Long parkingSpaceId, Integer duration) {
-		try {
-			User user = userService.getUserById(userId)
-					.orElseThrow(() -> new IllegalArgumentException("User not found"));
-			ParkingSpace parkingSpace = parkingSpaceService.getParkingSpaceById(parkingSpaceId)
-					.orElseThrow(() -> new IllegalArgumentException("Parking Space not found"));
+		Long previousId = reservationRepository.findActiveIdByUserId(userId).orElse(null);
+		Long previousSpaceId = previousId == null ? null
+				: reservationRepository.findSpaceIdByReservationId(previousId).orElse(null);
 
-			if (!"available".equals(parkingSpace.getAvailabilityStatus())) {
-				throw new IllegalArgumentException("Parking space is not available");
+		Map<Long, ParkingSpace> spaces = lockSpaces(parkingSpaceId, previousSpaceId);
+		ParkingSpace parkingSpace = spaces.get(parkingSpaceId);
+		User user = userService.getUserById(userId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+		LocalDateTime now = now();
+
+		if (previousId != null) {
+			Reservation previous = lockReservation(previousId);
+			if (previous.isHoldOver(now)) {
+				expire(previous, spaces.get(previousSpaceId));
+			} else if (previous.isActive()) {
+				throw new ConflictException("You already have an active reservation (ID " + previousId
+						+ "). Cancel it before reserving another space");
 			}
-
-			Reservation reservation = new Reservation();
-			reservation.setUser(user);
-			reservation.setParkingSpace(parkingSpace);
-			reservation.setReservationTime(LocalDateTime.now());
-			reservation.setDuration(duration);
-
-			parkingSpace.setAvailabilityStatus("occupied");
-			parkingSpaceRepository.save(parkingSpace);
-
-			return reservationRepository.save(reservation);
-
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while making reservation: " + e.getMessage());
 		}
+		requireInService(parkingSpace);
+		if (parkingSpace.getAvailabilityStatus() != SpaceStatus.AVAILABLE) {
+			throw new ConflictException("Parking space is not available. Current status: "
+					+ parkingSpace.getAvailabilityStatus());
+		}
+
+		Reservation reservation = new Reservation();
+		reservation.setUser(user);
+		reservation.setParkingSpace(parkingSpace);
+		reservation.setReservationTime(now);
+		reservation.setDuration(duration);
+		reservation.setStatus(ReservationStatus.ACTIVE);
+		reservation.setExpiresAt(now.plus(holdTime));
+
+		parkingSpace.setAvailabilityStatus(SpaceStatus.RESERVED);
+		parkingSpaceRepository.save(parkingSpace);
+		Reservation saved = reservationRepository.save(reservation);
+		log.info("Reservation {} holds space {} for user {} until {}", saved.getReservationId(),
+				parkingSpaceId, userId, saved.getExpiresAt());
+		return saved;
 	}
 
 	/**
-	 * Update reservation details
-	 * 
-	 * @param reservationId
-	 * @param parkingSpaceId
-	 * @param duration
-	 * @return Updated reservation details
-	 */
-	public Reservation updateReservation(Long reservationId, Long parkingSpaceId, Integer duration) {
-		try {
-			Reservation reservation = getReservationById(reservationId);
-			ParkingSpace parkingSpace = parkingSpaceRepository.findByParkingSpaceId(parkingSpaceId).orElseThrow(
-					() -> new IllegalArgumentException("Parking space not found with id: " + parkingSpaceId));
-
-			reservation.setParkingSpace(parkingSpace);
-			reservation.setReservationTime(reservation.getReservationTime());
-			reservation.setDuration(duration);
-
-			parkingSpace.setAvailabilityStatus("occupied");
-			parkingSpaceRepository.save(parkingSpace);
-
-			return reservationRepository.save(reservation);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while updating reservation: " + e.getMessage());
-		}
-	}
-
-	/**
-	 * Delete reservation by reservationId
-	 * 
-	 * @param reservationId
+	 * Update an ACTIVE reservation: move it to another AVAILABLE space and/or change the expected duration.
+	 * The hold is not extended, otherwise a driver could keep a space forever by moving between spaces.
 	 */
 	@Transactional
-	public void deleteReservation(Long reservationId) {
-		try {
-			Reservation reservation = getReservationById(reservationId);
-			ParkingSpace parkingSpace = reservation.getParkingSpace();
-			parkingSpace.setAvailabilityStatus("available");
-			parkingSpaceRepository.save(parkingSpace);
+	public Reservation updateReservation(Long reservationId, Long parkingSpaceId, Integer duration) {
+		Long currentSpaceId = spaceIdOf(reservationId);
+		Map<Long, ParkingSpace> spaces = lockSpaces(currentSpaceId, parkingSpaceId);
+		Reservation reservation = lockReservation(reservationId);
+		requireOpen(reservation);
 
-			reservationRepository.deleteById(reservationId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while deleting reservation: " + e.getMessage());
+		if (!currentSpaceId.equals(parkingSpaceId)) {
+			ParkingSpace currentSpace = spaces.get(currentSpaceId);
+			ParkingSpace newSpace = spaces.get(parkingSpaceId);
+			requireInService(newSpace);
+			if (newSpace.getAvailabilityStatus() != SpaceStatus.AVAILABLE) {
+				throw new ConflictException("Parking space is not available. Current status: "
+						+ newSpace.getAvailabilityStatus());
+			}
+			release(currentSpace);
+			newSpace.setAvailabilityStatus(SpaceStatus.RESERVED);
+			parkingSpaceRepository.save(currentSpace);
+			parkingSpaceRepository.save(newSpace);
+			reservation.setParkingSpace(newSpace);
 		}
+		if (duration != null) {
+			reservation.setDuration(duration);
+		}
+		return reservationRepository.save(reservation);
+	}
+
+	/**
+	 * Cancel an ACTIVE reservation and release its space. The row is kept (status CANCELLED) so history and
+	 * feedback stay intact.
+	 */
+	@Transactional
+	public Reservation cancelReservation(Long reservationId) {
+		Long spaceId = spaceIdOf(reservationId);
+		ParkingSpace parkingSpace = lockSpaces(spaceId).get(spaceId);
+		Reservation reservation = lockReservation(reservationId);
+		if (!reservation.isActive()) {
+			throw new ConflictException("Only active reservations can be cancelled. Current status: "
+					+ reservation.getStatus());
+		}
+		reservation.cancel(now());
+		release(parkingSpace);
+		parkingSpaceRepository.save(parkingSpace);
+		log.info("Reservation {} cancelled, space {} released", reservationId, spaceId);
+		return reservationRepository.save(reservation);
+	}
+
+	@Transactional
+	public boolean expireReservation(Long reservationId) {
+		Long spaceId = reservationRepository.findSpaceIdByReservationId(reservationId).orElse(null);
+		if (spaceId == null) {
+			return false;
+		}
+		ParkingSpace parkingSpace = lockSpaces(spaceId).get(spaceId);
+		Reservation reservation = lockReservation(reservationId);
+		// Re-checked under the lock: the owner may have driven in, or another instance may have expired it
+		if (!reservation.isHoldOver(now())) {
+			return false;
+		}
+		expire(reservation, parkingSpace);
+		return true;
+	}
+
+	public List<Long> findOverdueReservationIds() {
+		return reservationRepository.findExpiredActiveIds(now());
 	}
 
 	/**
 	 * Get reservation detail by reservationId
-	 * 
+	 *
 	 * @param reservationId
 	 * @return Reservation data
 	 */
 	public Reservation getReservationById(Long reservationId) {
-		try {
-			return reservationRepository.findByReservationId(reservationId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching reservation by ID: " + e.getMessage());
+		Reservation reservation = reservationRepository.findByReservationId(reservationId);
+		if (reservation == null) {
+			throw new ResourceNotFoundException("Reservation not found with ID: " + reservationId);
 		}
+		return reservation;
 	}
 
 	/**
 	 * Get reservation detail by UserId
-	 * 
+	 *
 	 * @param userId
 	 * @return Reservation data
 	 */
-	public List<Reservation> getReservationsByUserId(User userId) {
-		try {
-			return reservationRepository.findAllByUser(userId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while fetching reservations by user ID: " + e.getMessage());
+	public List<Reservation> getReservationsByUserId(Long userId) {
+		return reservationRepository.findAllByUserUserId(userId);
+	}
+
+	// ------------------------------------------------------------------ helpers
+
+	/** Truncated to the database's precision, so values returned now equal the values read back later. */
+	private LocalDateTime now() {
+		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+	}
+
+	private Long spaceIdOf(Long reservationId) {
+		return reservationRepository.findSpaceIdByReservationId(reservationId)
+				.orElseThrow(() -> new ResourceNotFoundException("Reservation not found with ID: " + reservationId));
+	}
+
+	/**
+	 * Locks the given spaces (nulls and duplicates ignored) in ascending id order, the order used by every
+	 * writer, so concurrent transactions cannot deadlock on them.
+	 */
+	private Map<Long, ParkingSpace> lockSpaces(Long... parkingSpaceIds) {
+		Map<Long, ParkingSpace> locked = new TreeMap<>();
+		Stream.of(parkingSpaceIds).filter(Objects::nonNull).distinct().sorted().forEach(id -> locked.put(id,
+				parkingSpaceRepository.findByIdForUpdate(id).orElseThrow(
+						() -> new ResourceNotFoundException("Parking space not found with id: " + id))));
+		return locked;
+	}
+
+	private Reservation lockReservation(Long reservationId) {
+		return reservationRepository.findByIdForUpdate(reservationId)
+				.orElseThrow(() -> new ResourceNotFoundException("Reservation not found with ID: " + reservationId));
+	}
+
+	private void requireOpen(Reservation reservation) {
+		if (!reservation.isActive()) {
+			throw new ConflictException("Only active reservations can be changed. Current status: "
+					+ reservation.getStatus());
+		}
+		if (reservation.isHoldOver(now())) {
+			throw new ConflictException("Reservation has expired at " + reservation.getExpiresAt());
 		}
 	}
 
+	private static void requireInService(ParkingSpace parkingSpace) {
+		if (!Boolean.TRUE.equals(parkingSpace.getIsActive())) {
+			throw new BadRequestException("Parking space is not in service");
+		}
+	}
+
+	private void expire(Reservation reservation, ParkingSpace parkingSpace) {
+		reservation.expire();
+		release(parkingSpace);
+		parkingSpaceRepository.save(parkingSpace);
+		// Flushed now: a new reservation for the same user or space may be inserted next in this transaction,
+		// and the insert would otherwise reach the database before this update clears the unique guard columns.
+		reservationRepository.saveAndFlush(reservation);
+		log.info("Reservation {} expired (no-show), space {} released", reservation.getReservationId(),
+				parkingSpace.getParkingSpaceId());
+	}
+
+	/** A space held by a reservation goes back to AVAILABLE; any other status is left alone. */
+	static void release(ParkingSpace parkingSpace) {
+		if (parkingSpace.getAvailabilityStatus() == SpaceStatus.RESERVED) {
+			parkingSpace.setAvailabilityStatus(SpaceStatus.AVAILABLE);
+		}
+	}
 }

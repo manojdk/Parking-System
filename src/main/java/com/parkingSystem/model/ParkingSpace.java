@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import com.parkingSystem.enums.SlotType;
+import com.parkingSystem.enums.SpaceStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -25,8 +26,9 @@ public class ParkingSpace {
 	@Column(name = "space_number", unique = true, nullable = false)
 	private String spaceNumber;
 
-	@Column(name = "availability_status", nullable = false)
-	private String availabilityStatus;
+	@Enumerated(EnumType.STRING)
+	@Column(name = "availability_status", nullable = false, length = 20)
+	private SpaceStatus availabilityStatus;
 
 	@Column(name = "location", nullable = false)
 	private String location;

@@ -1,8 +1,11 @@
 package com.parkingSystem.config;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,19 +13,21 @@ import org.springframework.context.annotation.Configuration;
 public class CorsConfig {
 
 	/**
-	 * Cross origin configuration
-	 * 
-	 * @return
+	 * Central cross origin configuration, applied by Spring Security ({@code http.cors()}).
+	 * Allowed origins come from {@code app.cors.allowed-origins} (comma separated).
+	 *
+	 * @return CORS configuration source
 	 */
 	@Bean
-	public CorsFilter corsFilter() {
+	public CorsConfigurationSource corsConfigurationSource(
+			@Value("${app.cors.allowed-origins:http://localhost:3000}") List<String> allowedOrigins) {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowCredentials(true);
-		config.addAllowedOrigin("http://localhost:3000"); // Frontend URL
+		config.setAllowedOrigins(allowedOrigins); // Frontend URL(s)
 		config.addAllowedHeader("*");
 		config.addAllowedMethod("*");
 		source.registerCorsConfiguration("/**", config);
-		return new CorsFilter(source);
+		return source;
 	}
 }

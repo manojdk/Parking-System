@@ -1,6 +1,9 @@
 package com.parkingSystem.service;
 
+import com.parkingSystem.enums.SlotType;
+import com.parkingSystem.enums.SpaceStatus;
 import com.parkingSystem.model.ParkingSpace;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,12 +29,12 @@ public interface IParkingSpaceService {
     Optional<ParkingSpace> getParkingSpaceById(long parkingSpaceId);
 
     /**
-     * Get available Parking space detail
+     * In-service parking spaces with the given status
      *
-     * @param availabilityStatus Status available or occupied
+     * @param availabilityStatus status to filter on
      * @return Parking space data
      */
-    List<ParkingSpace> getAvailableParkingSpaces(String availabilityStatus);
+    List<ParkingSpace> getAvailableParkingSpaces(SpaceStatus availabilityStatus);
 
     /**
      * Get Parking Space detail by parkingSpaceId
@@ -64,14 +67,15 @@ public interface IParkingSpaceService {
      * @param location           Location of parking space
      * @param type               Type of space
      * @param rate               Rate of parking space
-     * @param availabilityStatus Availaible space
+     * @param status             AVAILABLE or OUT_OF_SERVICE; null keeps the current status
      * @return Updated Parking space data
      */
-    ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, String type, Double rate,
-            Boolean availabilityStatus);
+    ParkingSpace updateParkingSpace(Long parkingSpaceId, String location, SlotType type, BigDecimal rate,
+            SpaceStatus status);
 
     /**
-     * Delete Parking space by Parking space Id
+     * Remove a parking space. A space with tickets or reservations in its history is deactivated (kept for
+     * the records) instead of deleted. A space that is RESERVED or OCCUPIED cannot be removed.
      *
      * @param parkingSpaceId Parking space ID
      */

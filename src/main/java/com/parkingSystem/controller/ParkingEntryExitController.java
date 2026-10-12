@@ -1,13 +1,19 @@
 package com.parkingSystem.controller;
 
+import com.parkingSystem.dto.BillDTO;
+import com.parkingSystem.exception.ResourceNotFoundException;
+import com.parkingSystem.security.CurrentUserService;
+import com.parkingSystem.service.IBillingService;
 import com.parkingSystem.service.IParkingEntryExitService;
 import com.parkingSystem.model.ParkingTicket;
 import com.parkingSystem.dto.VehicleEntryRequest;
 import com.parkingSystem.dto.ParkingTicketDTO;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,51 +31,46 @@ import java.util.stream.Collectors;
 public class ParkingEntryExitController {
 
     private IParkingEntryExitService parkingEntryExitService;
+    private IBillingService billingService;
+    private CurrentUserService currentUserService;
 
     /**
      * Record vehicle entry
      */
     @PostMapping("/entry")
-    public ResponseEntity<?> recordVehicleEntry(@RequestBody VehicleEntryRequest request) {
-        try {
-            log.info("Vehicle entry request received");
-            ParkingTicket ticket = parkingEntryExitService.recordVehicleEntry(
-                    request.getUserId(),
-                    request.getVehicleId(),
-                    request.getParkingSpaceId()
-            );
+    public ResponseEntity<?> recordVehicleEntry(@Valid @RequestBody VehicleEntryRequest request) {
+        log.info("Vehicle entry request received");
+        Long userId = currentUserService.resolveUserId(request.getUserId());
+        ParkingTicket ticket = parkingEntryExitService.recordVehicleEntry(
+                userId,
+                request.getVehicleId(),
+                request.getParkingSpaceId()
+        );
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Vehicle entry recorded successfully");
-            response.put("ticket", convertToDTO(ticket));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            log.error("Error recording vehicle entry: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Vehicle entry recorded successfully");
+        response.put("ticket", convertToDTO(ticket));
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
-     * Record vehicle exit
+     * Record vehicle exit. The hourly bill is generated as part of the exit and returned.
      */
     @PostMapping("/exit")
     public ResponseEntity<?> recordVehicleExit(@RequestParam String ticketReference) {
-        try {
-            log.info("Vehicle exit request received for ticket: {}", ticketReference);
-            ParkingTicket ticket = parkingEntryExitService.recordVehicleExit(ticketReference);
+        log.info("Vehicle exit request received for ticket: {}", ticketReference);
+        currentUserService.checkAccess(findTicket(ticketReference).getUser().getUserId());
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Vehicle exit recorded successfully");
-            response.put("ticket", convertToDTO(ticket));
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error recording vehicle exit: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        ParkingTicket ticket = parkingEntryExitService.recordVehicleExit(ticketReference);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Vehicle exit recorded successfully");
+        response.put("ticket", convertToDTO(ticket));
+        billingService.getBillForTicket(ticket.getTicketId())
+                .ifPresent(bill -> response.put("bill", BillDTO.from(bill)));
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -77,38 +78,27 @@ public class ParkingEntryExitController {
      */
     @GetMapping("/ticket/{ticketReference}")
     public ResponseEntity<?> getTicketDetails(@PathVariable String ticketReference) {
-        try {
-            ParkingTicket ticket = parkingEntryExitService.getTicketDetails(ticketReference)
-                    .orElseThrow(() -> new IllegalArgumentException("Ticket not found"));
-            return ResponseEntity.ok(convertToDTO(ticket));
-        } catch (Exception e) {
-            log.error("Error fetching ticket: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        ParkingTicket ticket = findTicket(ticketReference);
+        currentUserService.checkAccess(ticket.getUser().getUserId());
+        return ResponseEntity.ok(convertToDTO(ticket));
     }
 
     /**
      * Get all active parking sessions (currently parked vehicles)
      */
     @GetMapping("/active-sessions")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getActiveSessions() {
-        try {
-            List<ParkingTicket> activeTickets = parkingEntryExitService.getActiveTickets();
-            List<ParkingTicketDTO> dtos = activeTickets.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
+        List<ParkingTicket> activeTickets = parkingEntryExitService.getActiveTickets();
+        List<ParkingTicketDTO> dtos = activeTickets.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("count", activeTickets.size());
-            response.put("activeParking", dtos);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error fetching active sessions: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("count", activeTickets.size());
+        response.put("activeParking", dtos);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -116,22 +106,17 @@ public class ParkingEntryExitController {
      */
     @GetMapping("/history/{userId}")
     public ResponseEntity<?> getUserParkingHistory(@PathVariable Long userId) {
-        try {
-            List<ParkingTicket> history = parkingEntryExitService.getUserParkingHistory(userId);
-            List<ParkingTicketDTO> dtos = history.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
+        currentUserService.checkAccess(userId);
+        List<ParkingTicket> history = parkingEntryExitService.getUserParkingHistory(userId);
+        List<ParkingTicketDTO> dtos = history.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("count", history.size());
-            response.put("parkingHistory", dtos);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error fetching parking history: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("count", history.size());
+        response.put("parkingHistory", dtos);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -139,41 +124,30 @@ public class ParkingEntryExitController {
      */
     @GetMapping("/user-active/{userId}")
     public ResponseEntity<?> getUserActiveParking(@PathVariable Long userId) {
-        try {
-            List<ParkingTicket> activeParking = parkingEntryExitService.getUserActiveParking(userId);
-            List<ParkingTicketDTO> dtos = activeParking.stream()
-                    .map(this::convertToDTO)
-                    .collect(Collectors.toList());
+        currentUserService.checkAccess(userId);
+        List<ParkingTicket> activeParking = parkingEntryExitService.getUserActiveParking(userId);
+        List<ParkingTicketDTO> dtos = activeParking.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("count", activeParking.size());
-            response.put("activeParking", dtos);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error fetching active parking: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("count", activeParking.size());
+        response.put("activeParking", dtos);
+        return ResponseEntity.ok(response);
     }
 
     /**
-     * Get current occupancy
+     * Get current occupancy (public)
      */
     @GetMapping("/occupancy")
     public ResponseEntity<?> getCurrentOccupancy() {
-        try {
-            Long occupancy = parkingEntryExitService.getCurrentOccupancy();
+        Long occupancy = parkingEntryExitService.getCurrentOccupancy();
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("currentOccupancy", occupancy);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error fetching occupancy: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("currentOccupancy", occupancy);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -182,19 +156,19 @@ public class ParkingEntryExitController {
     @PostMapping("/cancel")
     public ResponseEntity<?> cancelTicket(@RequestParam String ticketReference,
                                            @RequestParam(required = false, defaultValue = "No reason provided") String reason) {
-        try {
-            ParkingTicket ticket = parkingEntryExitService.cancelTicket(ticketReference, reason);
+        currentUserService.checkAccess(findTicket(ticketReference).getUser().getUserId());
+        ParkingTicket ticket = parkingEntryExitService.cancelTicket(ticketReference, reason);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Ticket cancelled successfully");
-            response.put("ticket", convertToDTO(ticket));
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error cancelling ticket: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Ticket cancelled successfully");
+        response.put("ticket", convertToDTO(ticket));
+        return ResponseEntity.ok(response);
+    }
+
+    private ParkingTicket findTicket(String ticketReference) {
+        return parkingEntryExitService.getTicketDetails(ticketReference)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found with reference: " + ticketReference));
     }
 
     /**

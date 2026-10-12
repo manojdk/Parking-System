@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import com.parkingSystem.enums.BillingStatus;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Bill/Invoice model for tracking parking charges
@@ -77,7 +78,7 @@ public class Bill {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         if (this.invoiceNumber == null) {
-            this.invoiceNumber = "INV-" + System.currentTimeMillis();
+            this.invoiceNumber = "INV-" + UUID.randomUUID().toString().toUpperCase();
         }
         if (this.billingDate == null) {
             this.billingDate = LocalDateTime.now();

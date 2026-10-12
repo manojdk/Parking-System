@@ -34,5 +34,9 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     List<Bill> findByStatusOrderByBillingDateDesc(BillingStatus status);
 
     Long countByStatus(BillingStatus status);
+
+    boolean existsByParkingTicketTicketId(Long ticketId);
+
+    Optional<Bill> findByParkingTicketTicketId(Long ticketId);
 }
 

@@ -1,7 +1,11 @@
 package com.parkingSystem.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class LoginRequest {
+    @NotBlank(message = "username is mandatory")
     private String username;
+    @NotBlank(message = "password is mandatory")
     private String password;
 
     public LoginRequest() {}
