@@ -1,8 +1,6 @@
 package com.parkingSystem.service;
 
 import com.parkingSystem.model.Feedback;
-import com.parkingSystem.model.User;
-import com.parkingSystem.model.Reservation;
 import java.util.List;
 
 /**
@@ -56,16 +54,16 @@ public interface IFeedbackService {
     /**
      * Get feedback by user ID
      *
-     * @param userId User
+     * @param userId User ID
      * @return List of feedback
      */
-    List<Feedback> getFeedbacksByUserId(User userId);
+    List<Feedback> getFeedbacksByUserId(Long userId);
 
     /**
      * Get feedback by reservation ID
      *
-     * @param reservationId Reservation
+     * @param reservationId Reservation ID
      * @return List of feedback
      */
-    List<Feedback> getFeedbacksByReservationId(Reservation reservationId);
+    List<Feedback> getFeedbacksByReservationId(Long reservationId);
 }

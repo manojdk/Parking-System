@@ -65,12 +65,35 @@ public class ParkingTicket {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Space id while the ticket is ACTIVE, otherwise null. Backed by a unique constraint, so the database
+     * rejects a second ACTIVE ticket for the same space (see V3 migration). Maintained by {@link #syncGuards()}.
+     */
+    @Column(name = "active_space_id")
+    private Long activeSpaceId;
+
+    /** Vehicle id while the ticket is ACTIVE, otherwise null; unique, like {@link #activeSpaceId}. */
+    @Column(name = "active_vehicle_id")
+    private Long activeVehicleId;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         if (this.ticketReference == null) {
             this.ticketReference = "TKT-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase();
         }
+        syncGuards();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        syncGuards();
+    }
+
+    void syncGuards() {
+        boolean active = status == TicketStatus.ACTIVE;
+        this.activeSpaceId = active && parkingSpace != null ? parkingSpace.getParkingSpaceId() : null;
+        this.activeVehicleId = active && vehicle != null ? vehicle.getVehicleId() : null;
     }
 }
 

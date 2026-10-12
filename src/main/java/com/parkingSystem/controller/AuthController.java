@@ -5,11 +5,10 @@ import com.parkingSystem.dto.AuthResponse;
 import com.parkingSystem.dto.LoginRequest;
 import com.parkingSystem.model.User;
 import com.parkingSystem.service.IUserService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,23 +28,18 @@ public class AuthController {
         this.userService = userService;
     }
 
+    /**
+     * Authenticates the user and returns a JWT. Bad credentials are answered with 401
+     * by the global exception handler.
+     */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
-            User user = userService.getUserByUsername(request.getUsername());
-            
-            if (user == null) {
-                return ResponseEntity.status(401).body("User not found after authentication");
-            }
+        User user = userService.getUserByUsername(request.getUsername());
+        String token = jwtUtil.generateToken(user.getUserName(), user.getRole());
 
-            String token = jwtUtil.generateToken(user.getUserName(), user.getRole());
-
-            return ResponseEntity.ok(new AuthResponse(token, user.getRole()));
-        } catch (AuthenticationException e) {
-            return ResponseEntity.status(401).body("Invalid credentials");
-        }
+        return ResponseEntity.ok(new AuthResponse(token, user.getRole(), user.getUserId()));
     }
 }

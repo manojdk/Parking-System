@@ -43,19 +43,9 @@ public interface ISlotAllocationService {
     Optional<ParkingSpace> recommendSlot(String location, String vehicleType);
 
     /**
-     * Check if slot is available
+     * Check if slot is available (in service and AVAILABLE)
      */
     boolean isSlotAvailable(Long parkingSpaceId);
-
-    /**
-     * Allocate slot
-     */
-    ParkingSpace allocateSlot(Long parkingSpaceId);
-
-    /**
-     * Release slot
-     */
-    void releaseSlot(Long parkingSpaceId);
 
     /**
      * Get slots by priority

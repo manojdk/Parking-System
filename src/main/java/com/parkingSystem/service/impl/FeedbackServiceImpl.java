@@ -2,9 +2,12 @@ package com.parkingSystem.service.impl;
 
 import java.util.List;
 
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.parkingSystem.exception.BadRequestException;
+import com.parkingSystem.exception.ConflictException;
+import com.parkingSystem.enums.ReservationStatus;
+import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.model.Feedback;
 import com.parkingSystem.model.Reservation;
 import com.parkingSystem.model.User;
@@ -32,12 +35,7 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * @return Feedback data
 	 */
 	public List<Feedback> getAllFeedback() {
-		try {
-			return feedbackRepository.findAll();
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Error occurred while fetching feedback data: " + e.getMostSpecificCause().getMessage());
-		}
+		return feedbackRepository.findAll();
 	}
 
 	/**
@@ -51,26 +49,30 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 */
 	@Transactional
 	public Feedback createFeedback(Long userId, Long reservationId, Integer rating, String comments) {
-		try {
-			// Retrieve the user and reservation
-			User user = userRepository.findByUserId(userId)
-					.orElseThrow(() -> new IllegalArgumentException("User not found."));
-			Reservation reservation = reservationRepository.findByReservationId(reservationId);
-
-			// Create new feedback
-			Feedback feedback = new Feedback();
-			feedback.setUser(user);
-			feedback.setReservation(reservation);
-			feedback.setRating(rating);
-			feedback.setComments(comments);
-
-			// Save feedback
-			return feedbackRepository.save(feedback);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while adding feedback: " + e.getMessage());
-		} catch (IllegalArgumentException e) {
-			throw e;
+		// Retrieve the user and reservation
+		User user = userRepository.findByUserId(userId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+		Reservation reservation = getReservation(reservationId);
+		if (!user.getUserId().equals(reservation.getUser().getUserId())) {
+			throw new BadRequestException("Reservation does not belong to this user");
 		}
+		if (reservation.getStatus() != ReservationStatus.FULFILLED) {
+			throw new BadRequestException("Feedback can only be given for a reservation that was used. Current status: "
+					+ reservation.getStatus());
+		}
+		if (feedbackRepository.existsByReservationReservationId(reservationId)) {
+			throw new ConflictException("Feedback already exists for this reservation; update it instead");
+		}
+
+		// Create new feedback
+		Feedback feedback = new Feedback();
+		feedback.setUser(user);
+		feedback.setReservation(reservation);
+		feedback.setRating(rating);
+		feedback.setComments(comments);
+
+		// Save feedback
+		return feedbackRepository.save(feedback);
 	}
 
 	/**
@@ -80,11 +82,11 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * @return Feedback data
 	 */
 	public Feedback getFeedbackById(Long feedbackId) {
-		try {
-			return feedbackRepository.findByFeedbackId(feedbackId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching feedback by ID: " + e.getMessage());
+		Feedback feedback = feedbackRepository.findByFeedbackId(feedbackId);
+		if (feedback == null) {
+			throw new ResourceNotFoundException("Feedback not found with ID: " + feedbackId);
 		}
+		return feedback;
 	}
 
 	/**
@@ -97,21 +99,16 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 */
 	@Transactional
 	public Feedback updateFeedback(Long feedbackId, Integer rating, String comments) {
-		try {
-			Feedback feedback = feedbackRepository.findByFeedbackId(feedbackId);
+		Feedback feedback = getFeedbackById(feedbackId);
 
-			if (rating != null) {
-				feedback.setRating(rating);
-			}
-			if (comments != null) {
-				feedback.setComments(comments);
-			}
-
-			return feedbackRepository.save(feedback);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while updating feedback: " + e.getMostSpecificCause().getMessage());
+		if (rating != null) {
+			feedback.setRating(rating);
 		}
+		if (comments != null) {
+			feedback.setComments(comments);
+		}
+
+		return feedbackRepository.save(feedback);
 	}
 
 	/**
@@ -120,13 +117,8 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * @param userId
 	 * @return Feedback Data
 	 */
-	public List<Feedback> getFeedbacksByUserId(User userId) {
-		try {
-			return feedbackRepository.findAllByUser(userId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while fetching feedbacks by user ID: " + e.getMessage());
-		}
+	public List<Feedback> getFeedbacksByUserId(Long userId) {
+		return feedbackRepository.findAllByUserUserId(userId);
 	}
 
 	/**
@@ -135,13 +127,8 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 * @param reservationId
 	 * @return Feedback Data
 	 */
-	public List<Feedback> getFeedbacksByReservationId(Reservation reservationId) {
-		try {
-			return feedbackRepository.findAllByReservation(reservationId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while fetching feedbacks by reservation ID: " + e.getMessage());
-		}
+	public List<Feedback> getFeedbacksByReservationId(Long reservationId) {
+		return feedbackRepository.findAllByReservation(getReservation(reservationId));
 	}
 
 	/**
@@ -151,11 +138,15 @@ public class FeedbackServiceImpl implements IFeedbackService {
 	 */
 	@Transactional
 	public void deleteFeedback(Long feedbackId) {
-		try {
-			feedbackRepository.deleteByFeedbackId(feedbackId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException(
-					"Database error occurred while deleting feedback: " + e.getMostSpecificCause().getMessage());
+		getFeedbackById(feedbackId);
+		feedbackRepository.deleteByFeedbackId(feedbackId);
+	}
+
+	private Reservation getReservation(Long reservationId) {
+		Reservation reservation = reservationRepository.findByReservationId(reservationId);
+		if (reservation == null) {
+			throw new ResourceNotFoundException("Reservation not found with ID: " + reservationId);
 		}
+		return reservation;
 	}
 }

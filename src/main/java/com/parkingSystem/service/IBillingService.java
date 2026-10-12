@@ -26,6 +26,18 @@ public interface IBillingService {
     Bill markBillAsPaid(Long billId, String paymentMethod);
 
     /**
+     * Get bill by ID
+     *
+     * @throws com.parkingSystem.exception.ResourceNotFoundException if it does not exist
+     */
+    Bill getBillById(Long billId);
+
+    /**
+     * Get the bill generated for a ticket, if any
+     */
+    Optional<Bill> getBillForTicket(Long ticketId);
+
+    /**
      * Get bill by invoice number
      */
     Optional<Bill> getBillByInvoiceNumber(String invoiceNumber);

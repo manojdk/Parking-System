@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,11 +16,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.parkingSystem.dto.ParkingSpaceRequest;
+import com.parkingSystem.dto.UpdateParkingSpaceRequest;
+import com.parkingSystem.enums.SpaceStatus;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.service.IParkingSpaceService;
 
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 
+/**
+ * Parking space management. Everything is admin-only except the public availability lookup.
+ */
 @RestController
 @RequestMapping("/api/parkingspace")
 @AllArgsConstructor
@@ -28,95 +36,72 @@ public class ParkingSpaceController {
 	private IParkingSpaceService parkingSpaceService;
 
 	@GetMapping(value = "/all/details")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Object> getAllParkingSpaces() {
-		try {
-			List<ParkingSpace> parkingSpaces = parkingSpaceService.getAllParkingSpaces();
-			return ResponseEntity.ok(parkingSpaces);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error fetching parking spaces: " + e.getMessage());
-		}
+		List<ParkingSpace> parkingSpaces = parkingSpaceService.getAllParkingSpaces();
+		return ResponseEntity.ok(parkingSpaces);
 	}
 
 	@GetMapping("/details/id")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Object> getParkingSpaceDetails(@RequestParam Long parkingSpaceId) {
-		try {
-			Map<String, Object> parkingSpaceDetails = parkingSpaceService.getParkingSpaceDetails(parkingSpaceId);
-			return ResponseEntity.ok(parkingSpaceDetails);
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error fetching parking space details: " + e.getMessage());
-		}
+		Map<String, Object> parkingSpaceDetails = parkingSpaceService.getParkingSpaceDetails(parkingSpaceId);
+		return ResponseEntity.ok(parkingSpaceDetails);
 	}
 
 	@PostMapping("/register")
-	public ResponseEntity<Object> addParkingSpace(@RequestBody ParkingSpace request) {
-		try {
-			ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(request);
-			return ResponseEntity.ok(addedParkingSpace);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error adding parking space: " + e.getMessage());
-		}
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<Object> addParkingSpace(@Valid @RequestBody ParkingSpaceRequest request) {
+		ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(toEntity(request));
+		return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpace);
 	}
 
 	@PostMapping("/register/multiple")
-	public ResponseEntity<Object> addMultipleParkingSpaces(@RequestBody List<ParkingSpace> parkingSpaceRequests) {
-		try {
-			List<ParkingSpace> addedParkingSpaces = parkingSpaceService.addMultipleParkingSpaces(parkingSpaceRequests);
-			return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpaces);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error adding parking spaces: " + e.getMessage());
-		}
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<Object> addMultipleParkingSpaces(
+			@RequestBody List<@Valid ParkingSpaceRequest> parkingSpaceRequests) {
+		List<ParkingSpace> addedParkingSpaces = parkingSpaceService
+				.addMultipleParkingSpaces(parkingSpaceRequests.stream().map(ParkingSpaceController::toEntity).toList());
+		return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpaces);
 	}
 
 	@PutMapping("/update")
-	public ResponseEntity<Object> updateParkingSpace(@RequestBody Map<String, Object> request) {
-		try {
-			Long parkingSpaceId = Long.parseLong(request.get("parkingSpaceId").toString());
-			String location = (String) request.get("location");
-			String type = (String) request.get("type");
-			Double rate = request.containsKey("rate") ? Double.parseDouble(request.get("rate").toString()) : null;
-			Boolean availabilityStatus = Boolean.valueOf(request.get("availabilityStatus").toString());
-
-			ParkingSpace updatedParkingSpace = parkingSpaceService.updateParkingSpace(parkingSpaceId, location, type,
-					rate, availabilityStatus);
-
-			return ResponseEntity.ok(updatedParkingSpace);
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error updating parking space: " + e.getMessage());
-		}
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<Object> updateParkingSpace(@Valid @RequestBody UpdateParkingSpaceRequest request) {
+		ParkingSpace updatedParkingSpace = parkingSpaceService.updateParkingSpace(request.getParkingSpaceId(),
+				request.getLocation(), request.getType(), request.getRate(), request.getStatus());
+		return ResponseEntity.ok(updatedParkingSpace);
 	}
 
 	@DeleteMapping("/remove")
+	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Object> deleteParkingSpaceById(@RequestParam Long parkingSpaceId) {
-		try {
-			parkingSpaceService.deleteParkingSpace(parkingSpaceId);
-			Map<String, Object> response = new HashMap<>();
-			response.put("status", "success");
-			response.put("message", "Parking space deleted successfully");
-			return ResponseEntity.ok(response);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND)
-					.body("Parking space not found with ID: " + parkingSpaceId);
-		}
+		parkingSpaceService.deleteParkingSpace(parkingSpaceId);
+		Map<String, Object> response = new HashMap<>();
+		response.put("status", "success");
+		response.put("message", "Parking space removed successfully");
+		return ResponseEntity.ok(response);
 	}
 
+	/**
+	 * Public: lists in-service parking spaces by status (AVAILABLE by default; case-insensitive).
+	 */
 	@GetMapping("/available")
-	public ResponseEntity<Object> getAvailableParkingSpaces(@RequestParam String availabilityStatus) {
-		try {
-			List<ParkingSpace> availableParkingSpaces = parkingSpaceService
-					.getAvailableParkingSpaces(availabilityStatus);
-			return ResponseEntity.ok(availableParkingSpaces);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body("Error fetching available parking spaces: " + e.getMessage());
-		}
+	public ResponseEntity<Object> getAvailableParkingSpaces(
+			@RequestParam(defaultValue = "AVAILABLE") String availabilityStatus) {
+		List<ParkingSpace> availableParkingSpaces = parkingSpaceService
+				.getAvailableParkingSpaces(SpaceStatus.fromValue(availabilityStatus));
+		return ResponseEntity.ok(availableParkingSpaces);
+	}
+
+	private static ParkingSpace toEntity(ParkingSpaceRequest request) {
+		return ParkingSpace.builder()
+				.spaceNumber(request.getSpaceNumber())
+				.location(request.getLocation())
+				.floorNumber(request.getFloorNumber())
+				.slotType(request.getSlotType())
+				.ratePerHour(request.getRatePerHour())
+				.notes(request.getNotes())
+				.build();
 	}
 }

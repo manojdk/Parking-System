@@ -27,7 +27,7 @@ public interface IUserService {
      * @param userId User ID
      * @return User data
      */
-    Map<String, Object> getUserDeatils(Long userId);
+    Map<String, Object> getUserDetails(Long userId);
 
     /**
      * Update user data

@@ -8,10 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.parkingSystem.exception.ConflictException;
+import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.UserRepository;
 import com.parkingSystem.service.IUserService;
@@ -40,33 +41,24 @@ public class UserServiceImpl implements IUserService {
 	 * @return User data to repository
 	 */
 	public User registerUser(String userName, String email, String password, String licensePlate) {
-		try {
-			// Check if the username or email already exists
-			if (userRepository.existsByUserName(userName)) {
-				throw new IllegalArgumentException("Username already exists.");
-			}
-			if (userRepository.existsByUserEmail(email)) {
-				throw new IllegalArgumentException("Email already exists.");
-			}
-
-			// Create and save the user
-			User user = new User();
-			user.setUserName(userName);
-			user.setUserEmail(email);
-			user.setPassword(passwordEncoder.encode(password));
-			user.setLicencePlate(licensePlate);
-			user.setCreatedDate(LocalDateTime.now());
-			user.setRegistrationDate(new Date(System.currentTimeMillis()));
-
-			return userRepository.save(user);
-		} catch (DataAccessException e) {
-			log.error("error : ", e);
-			throw new RuntimeException("Database error occurred while registering user: " + e.getMessage());
-
-		} catch (IllegalArgumentException e) {
-			log.error("error : ", e);
-			throw e;
+		// Check if the username or email already exists
+		if (userRepository.existsByUserName(userName)) {
+			throw new ConflictException("Username already exists.");
 		}
+		if (userRepository.existsByUserEmail(email)) {
+			throw new ConflictException("Email already exists.");
+		}
+
+		// Create and save the user
+		User user = new User();
+		user.setUserName(userName);
+		user.setUserEmail(email);
+		user.setPassword(passwordEncoder.encode(password));
+		user.setLicencePlate(licensePlate);
+		user.setCreatedDate(LocalDateTime.now());
+		user.setRegistrationDate(new Date(System.currentTimeMillis()));
+
+		return userRepository.save(user);
 	}
 
 	/**
@@ -75,34 +67,28 @@ public class UserServiceImpl implements IUserService {
 	 * @param userId User ID
 	 * @return User data
 	 */
-	public Map<String, Object> getUserDeatils(Long userId) {
-		try {
-			Optional<User> userOptional = getUserById(userId);
+	public Map<String, Object> getUserDetails(Long userId) {
+		User user = getUserById(userId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-			if (userOptional.isEmpty()) {
-				throw new IllegalArgumentException("User not found with ID: " + userId);
-			}
+		Map<String, Object> profile = new HashMap<>();
+		profile.put("licensePlate", user.getLicencePlate());
+		profile.put("createdDate", user.getCreatedDate());
 
-			User user = userOptional.get();
-			Map<String, Object> profile = new HashMap<>();
-			profile.put("licensePlate", user.getLicencePlate());
-			profile.put("createdDate", user.getCreatedDate());
+		Map<String, Object> userProfile = new LinkedHashMap<>();
+		userProfile.put("userId", user.getUserId());
+		userProfile.put("userName", user.getUserName());
+		userProfile.put("userEmail", user.getUserEmail());
+		userProfile.put("role", user.getRole());
+		userProfile.put("registrationDate", user.getRegistrationDate());
+		userProfile.put("profile", profile);
 
-			Map<String, Object> userProfile = new LinkedHashMap<>();
-			userProfile.put("userId", user.getUserId());
-			userProfile.put("userName", user.getUserName());
-			userProfile.put("userEmail", user.getUserEmail());
-			userProfile.put("registrationDate", user.getRegistrationDate());
-			userProfile.put("profile", profile);
-
-			return userProfile;
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching user details: " + e.getMessage());
-		}
+		return userProfile;
 	}
 
 	/**
-	 * Update user data
+	 * Update user data. Null fields are left unchanged; the role is never changed here.
+	 * Changing the user name invalidates existing JWTs (they are bound to the user name).
 	 * 
 	 * @param userId       User ID
 	 * @param userName     User name
@@ -112,27 +98,27 @@ public class UserServiceImpl implements IUserService {
 	 * @return Updated user data saved
 	 */
 	public User updateUser(Long userId, String userName, String userEmail, String password, String licensePlate) {
-		try {
-			Optional<User> userOptional = userRepository.findByUserId(userId);
+		User user = userRepository.findByUserId(userId)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-			if (userOptional.isEmpty()) {
-				throw new IllegalArgumentException("User not found with ID: " + userId);
+		if (userName != null && !userName.equals(user.getUserName())) {
+			if (userRepository.existsByUserName(userName)) {
+				throw new ConflictException("Username already exists.");
 			}
-
-			User user = userOptional.get();
-			if (userName != null)
-				user.setUserName(userName);
-			if (userEmail != null)
-				user.setUserEmail(userEmail);
-			if (password != null)
-				user.setPassword(passwordEncoder.encode(password));
-			if (licensePlate != null)
-				user.setLicencePlate(licensePlate);
-
-			return userRepository.save(user);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while updating user: " + e.getMessage());
+			user.setUserName(userName);
 		}
+		if (userEmail != null && !userEmail.equals(user.getUserEmail())) {
+			if (userRepository.existsByUserEmail(userEmail)) {
+				throw new ConflictException("Email already exists.");
+			}
+			user.setUserEmail(userEmail);
+		}
+		if (password != null)
+			user.setPassword(passwordEncoder.encode(password));
+		if (licensePlate != null)
+			user.setLicencePlate(licensePlate);
+
+		return userRepository.save(user);
 	}
 
 	/**
@@ -142,11 +128,7 @@ public class UserServiceImpl implements IUserService {
 	 * @return user data by Id
 	 */
 	public Optional<User> getUserById(Long userId) {
-		try {
-			return userRepository.findByUserId(userId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching user by ID: " + e.getMessage());
-		}
+		return userRepository.findByUserId(userId);
 	}
 
 	/**
@@ -157,71 +139,47 @@ public class UserServiceImpl implements IUserService {
 	 * @return User detail
 	 */
 	public Optional<List<User>> getUserByUsername(String username, String userEmail) {
-		try {
-			return Optional.ofNullable(userRepository.findByUserNameAndUserEmail(username, userEmail));
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching user by Name" + e.getMessage());
-		}
+		return Optional.ofNullable(userRepository.findByUserNameAndUserEmail(username, userEmail));
 	}
 
 	public User getUserByUsername(String username) {
 		return userRepository.findByUserName(username)
-				.orElseThrow(() -> new IllegalArgumentException("User not found"));
+				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
 	}
 
 	/**
 	 * Get user by email
 	 */
 	public Optional<User> getUserByEmail(String email) {
-		try {
-			return userRepository.findByUserEmail(email);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching user by email: " + e.getMessage());
-		}
+		return userRepository.findByUserEmail(email);
 	}
 
 	/**
 	 * Get all users
 	 */
 	public List<User> getAllUsers() {
-		try {
-			return userRepository.findAll();
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while fetching all users: " + e.getMessage());
-		}
+		return userRepository.findAll();
 	}
 
 	/**
 	 * Delete user
 	 */
 	public void deleteUser(Long userId) {
-		try {
-			userRepository.deleteById(userId);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while deleting user: " + e.getMessage());
-		}
+		userRepository.deleteById(userId);
 	}
 
 	/**
 	 * Check if user exists by username
 	 */
 	public boolean existsByUserName(String userName) {
-		try {
-			return userRepository.existsByUserName(userName);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while checking username existence: " + e.getMessage());
-		}
+		return userRepository.existsByUserName(userName);
 	}
 
 	/**
 	 * Check if user exists by email
 	 */
 	public boolean existsByUserEmail(String email) {
-		try {
-			return userRepository.existsByUserEmail(email);
-		} catch (DataAccessException e) {
-			throw new RuntimeException("Database error occurred while checking email existence: " + e.getMessage());
-		}
+		return userRepository.existsByUserEmail(email);
 	}
 
 }
