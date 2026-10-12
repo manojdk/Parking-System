@@ -14,6 +14,7 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -77,6 +78,19 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
 			HttpServletRequest request) {
 		return build(HttpStatus.BAD_REQUEST, "Invalid value for parameter: " + ex.getName(), request);
+	}
+
+	@ExceptionHandler(InvalidSignatureException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidSignature(InvalidSignatureException ex,
+			HttpServletRequest request) {
+		log.warn("Rejected webhook on {}: {}", request.getRequestURI(), ex.getMessage());
+		return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
+	}
+
+	/** Missing required header (e.g. Idempotency-Key) and similar request binding problems. */
+	@ExceptionHandler(ServletRequestBindingException.class)
+	public ResponseEntity<ErrorResponse> handleBinding(ServletRequestBindingException ex, HttpServletRequest request) {
+		return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
 	}
 
 	@ExceptionHandler(AuthenticationException.class)

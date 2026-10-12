@@ -1,5 +1,6 @@
 package com.parkingSystem.integration;
 
+import com.parkingSystem.enums.PaymentMethod;
 import com.parkingSystem.enums.ReservationStatus;
 import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.enums.SpaceStatus;
@@ -10,12 +11,14 @@ import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.model.ParkingTicket;
 import com.parkingSystem.model.User;
 import com.parkingSystem.model.Vehicle;
+import com.parkingSystem.repository.BillRepository;
 import com.parkingSystem.repository.ParkingSpaceRepository;
 import com.parkingSystem.repository.ParkingTicketRepository;
 import com.parkingSystem.repository.ReservationRepository;
 import com.parkingSystem.repository.UserRepository;
 import com.parkingSystem.repository.VehicleRepository;
 import com.parkingSystem.service.IParkingEntryExitService;
+import com.parkingSystem.service.IPaymentService;
 import com.parkingSystem.service.IReservationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Many drivers racing for the same space at the same moment. Exactly one may win; everyone else must get a
+ * Many requests racing for the same space (or bill) at the same moment. Exactly one may win; everyone else must get a
  * clean 409 (ConflictException), never a second ticket or reservation and never an unexpected error.
  */
 @SpringBootTest
@@ -63,6 +66,10 @@ class ConcurrencyIntegrationTest {
     private ParkingTicketRepository parkingTicketRepository;
     @Autowired
     private ReservationRepository reservationRepository;
+    @Autowired
+    private BillRepository billRepository;
+    @Autowired
+    private IPaymentService paymentService;
 
     @Test
     void manyCarsEnteringOneSpaceAtOnceGiveExactlyOneTicket() throws Exception {
@@ -124,6 +131,30 @@ class ConcurrencyIntegrationTest {
         assertThat(outcome.successes).isEqualTo(1);
         assertThat(outcome.conflicts).isEqualTo(1);
         assertThat(outcome.unexpected).isEmpty();
+    }
+
+    @Test
+    void manyPaymentAttemptsForOneBillAtOnceStartExactlyOnePayment() throws Exception {
+        User driver = newUser();
+        Vehicle car = newVehicle(driver);
+        ParkingSpace space = newSpace();
+        ParkingTicket ticket = entryExitService.recordVehicleEntry(driver.getUserId(), car.getVehicleId(),
+                space.getParkingSpaceId());
+        entryExitService.recordVehicleExit(ticket.getTicketReference());
+        Long billId = billRepository.findByParkingTicketTicketId(ticket.getTicketId()).orElseThrow().getBillId();
+
+        List<Callable<Object>> attempts = new ArrayList<>();
+        for (int i = 0; i < DRIVERS; i++) {
+            String key = "parallel-key-" + i + "-" + System.nanoTime();
+            attempts.add(() -> paymentService.startPayment(driver.getUserId(), billId, PaymentMethod.CARD, key));
+        }
+
+        Outcome outcome = runAtTheSameTime(attempts);
+
+        assertThat(outcome.successes).isEqualTo(1);
+        assertThat(outcome.conflicts).isEqualTo(DRIVERS - 1);
+        assertThat(outcome.unexpected).isEmpty();
+        assertThat(paymentService.getPaymentsForBill(billId)).hasSize(1);
     }
 
     @Test

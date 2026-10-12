@@ -174,6 +174,45 @@ Services read the time from an injected `java.time.Clock` (`TimeConfig`), never 
 Tests swap in a `MutableClock` to jump past a reservation hold or fix a billing time without sleeping. Timestamps are
 truncated to microseconds, the database's precision, so a value returned by the API equals the value read back later.
 
+## Payments
+
+Users never mark a bill as paid themselves. They pay through a payment provider, and only the provider's signed
+confirmation settles the bill. The project ships a mock provider; a real one (Razorpay, Stripe) would implement
+`PaymentProvider` and send the same webhook.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as PaymentController
+    participant S as PaymentServiceImpl
+    participant P as Payment provider (mock)
+    U->>API: POST /api/payments {billId, method}<br/>Idempotency-Key: k1
+    API->>S: startPayment
+    S->>S: lock bill row; key k1 seen before? return that payment<br/>bill PENDING? no payment in progress?
+    S->>P: createCharge -> providerReference
+    API-->>U: 201 {PENDING, checkoutUrl}
+    U->>P: pays on the checkout page
+    P->>API: POST /api/payments/webhook<br/>X-Webhook-Timestamp, X-Webhook-Signature
+    API->>API: verify HMAC(timestamp + "." + raw body), timestamp within 5 min
+    API->>S: handleWebhook
+    S->>S: lock bill, then payment<br/>payment SUCCEEDED, bill PAID
+    API-->>P: 200 {APPLIED}
+```
+
+| Situation | Behaviour |
+|-----------|-----------|
+| Client retries with the same `Idempotency-Key` | The original payment is returned (200, `Idempotent-Replayed: true`); no second charge. Same key with a different bill or method is a 409. |
+| Second payment while one is PENDING | 409. A bill has at most one payment in progress (checked under the bill lock, backed by a unique guard column). |
+| No confirmation within 15 minutes | The payment becomes EXPIRED on the next attempt, and a new payment is allowed. |
+| Webhook delivered twice | The second delivery is a no-op (`DUPLICATE`). Providers retry webhooks, so this must be safe. |
+| FAILED after SUCCEEDED, or the reverse | 409; a final result never changes. |
+| Late SUCCEEDED for an expired payment | If the bill is still open it is paid. If it was already paid (by another payment or in cash), or its total changed, the payment is `REFUND_REQUIRED`: the money is flagged, the bill is never paid twice. |
+| Admin discount or cash payment during an online payment | 409, because the provider is charging the current total. |
+| Forged, altered or old webhook | 401. |
+
+The bill row is the lock for everything that changes its payment state (online payment, webhook, cash payment,
+discount), always taken before the payment row.
+
 ## Pricing
 
 - **Hourly** (used automatically on exit): every started hour is charged, minimum one hour.

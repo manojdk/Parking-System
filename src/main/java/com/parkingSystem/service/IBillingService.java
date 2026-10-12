@@ -21,7 +21,8 @@ public interface IBillingService {
     Bill generateBillWithSlabPricing(Long ticketId);
 
     /**
-     * Mark bill as paid
+     * Record a payment made outside the app (for example cash at the counter). Admin only; refused while an
+     * online payment for the bill is in progress, so the bill can never be paid twice.
      */
     Bill markBillAsPaid(Long billId, String paymentMethod);
 

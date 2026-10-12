@@ -59,6 +59,8 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults()) // uses the CorsConfigurationSource bean from CorsConfig
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers(HttpMethod.POST, "/api/users/register", "/api/auth/login").permitAll() // Public endpoints
+                // Called by the payment provider; trusted through its HMAC signature, not a JWT
+                .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
                 .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                 .requestMatchers(API_DOCS_ENDPOINTS).permitAll()
                 .requestMatchers("/error").permitAll()

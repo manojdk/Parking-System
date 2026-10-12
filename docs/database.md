@@ -13,6 +13,7 @@ checks that the migrations apply cleanly.
 | V2 | `V2__space_status_enum.sql` | `availability_status` becomes a fixed set of values; spaces held only by a legacy reservation are released |
 | V3 | `V3__one_active_ticket_per_space_and_vehicle.sql` | Database guarantee: at most one ACTIVE ticket per space and per vehicle |
 | V4 | `V4__reservation_lifecycle.sql` | Reservation status, hold expiry, link to the ticket; legacy reservations closed as EXPIRED |
+| V5 | `V5__payments.sql` | Online payment attempts with idempotency keys and a one-payment-in-progress guard |
 
 **Existing databases.** A database created by an older version of the app (`ddl-auto=update`) is adopted as
 version 1 (`spring.flyway.baseline-on-migrate=true`) and gets V2-V4 on the next start. If V3 fails, that database
@@ -126,6 +127,20 @@ these constraints are the safety net, and a violation is returned as a 409.
 | active_space_id, active_user_id | guard columns, **unique**; set only while ACTIVE |
 
 Index `ix_reservations_status_expires (status, expires_at)` serves the expiry job.
+
+### payments (`Payment`)
+| Column | Notes |
+|--------|-------|
+| payment_id | PK |
+| bill_id, user_id | FKs, not null |
+| amount, currency | bill total when the payment started; `INR` |
+| method | `CARD`, `UPI`, `NET_BANKING` |
+| status | `PENDING`, `SUCCEEDED`, `FAILED`, `EXPIRED`, `REFUND_REQUIRED` |
+| provider, provider_reference | e.g. `MOCK`, `mock_ch_...`; the reference is **unique** and is what webhooks refer to |
+| idempotency_key | **unique per user** (`user_id, idempotency_key`) |
+| failure_reason | |
+| created_at, expires_at, completed_at, updated_at | `expires_at` = created + `app.payments.pending-timeout-minutes` |
+| active_bill_id | guard column, **unique**; set only while PENDING |
 
 ### parking_feedback (`Feedback`)
 | Column | Notes |
