@@ -1,8 +1,10 @@
 package com.parkingSystem.service.impl;
 
 import com.parkingSystem.enums.ReservationStatus;
+import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.enums.SpaceStatus;
 import com.parkingSystem.enums.TicketStatus;
+import com.parkingSystem.enums.VehicleType;
 import com.parkingSystem.exception.BadRequestException;
 import com.parkingSystem.exception.ConflictException;
 import com.parkingSystem.model.ParkingSpace;
@@ -24,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -128,6 +129,28 @@ class ParkingEntryExitServiceImplTest {
 
         assertThatThrownBy(() -> service.recordVehicleEntry(1L, 10L, 100L))
                 .isInstanceOf(BadRequestException.class).hasMessageContaining("deactivated");
+    }
+
+    @Test
+    void vehicleMustFitTheSlotType() {
+        space.setSlotType(SlotType.BIKE);
+        givenEntryLookups();
+
+        assertThatThrownBy(() -> service.recordVehicleEntry(1L, 10L, 100L))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("CAR cannot park in a BIKE space");
+        verify(parkingTicketRepository, never()).save(any());
+    }
+
+    @Test
+    void onlyEvsMayUseAChargingBay() {
+        space.setSlotType(SlotType.EV_CHARGING);
+        givenEntryLookups();
+
+        assertThatThrownBy(() -> service.recordVehicleEntry(1L, 10L, 100L)).isInstanceOf(BadRequestException.class);
+
+        vehicle.setVehicleType(VehicleType.EV);
+        givenTicketSaveReturnsIt();
+        assertThat(service.recordVehicleEntry(1L, 10L, 100L).getStatus()).isEqualTo(TicketStatus.ACTIVE);
     }
 
     @Test
@@ -310,13 +333,15 @@ class ParkingEntryExitServiceImplTest {
     }
 
     private static Vehicle vehicle(Long id, User owner) {
-        return Vehicle.builder().vehicleId(id).user(owner).licensePlate("PLATE-" + id).isActive(true).build();
+        return Vehicle.builder().vehicleId(id).user(owner).licensePlate("PLATE-" + id).isActive(true)
+                .vehicleType(VehicleType.CAR).build();
     }
 
     private static ParkingSpace space(Long id, SpaceStatus status) {
         return ParkingSpace.builder()
                 .parkingSpaceId(id)
                 .spaceNumber("S-" + id)
+                .slotType(SlotType.NORMAL)
                 .ratePerHour(BigDecimal.TEN)
                 .availabilityStatus(status)
                 .isActive(true)

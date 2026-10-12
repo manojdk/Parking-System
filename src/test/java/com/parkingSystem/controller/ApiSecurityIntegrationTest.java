@@ -249,7 +249,7 @@ class ApiSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/billing/user/" + alice.userId + "/pending").header("Authorization", alice.bearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pendingCount").value(1));
+                .andExpect(jsonPath("$.totalElements").value(1));
 
         // the hourly bill already exists, so a second (slab) bill for the same ticket is rejected
         Number ticketId = JsonPath.read(entry.getResponse().getContentAsString(), "$.ticket.ticketId");

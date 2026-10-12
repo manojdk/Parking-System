@@ -92,7 +92,7 @@ sequenceDiagram
     Note over S,B: one transaction
     S->>S: lock space, then ticket; ticket must be ACTIVE<br/>set exit time, duration, CLOSED; space AVAILABLE
     S->>B: generateBill(ticketId)
-    B->>B: ticket CLOSED and not yet billed?<br/>hours = max(1, ceil(minutes / 60))<br/>base = hours x rate, tax = 10%
+    B->>B: ticket CLOSED and not yet billed?<br/>PricingCalculator: grace period, billable hours,<br/>hourly or slab base, daily cap, tax (see Pricing)
     C-->>U: 200 {ticket, bill}
 ```
 
@@ -215,9 +215,41 @@ discount), always taken before the payment row.
 
 ## Pricing
 
-- **Hourly** (used automatically on exit): every started hour is charged, minimum one hour.
-- **Slab** (admin, `POST /api/billing/generate-slab/{ticketId}`): first hour 100%, hours 2-3 at 90%, hours 4-8 at 80%,
-  beyond 8 at 70% of the hourly rate.
-- Tax: 10% of the base amount. Amounts are rounded to 2 decimals.
+All pricing rules live in `PricingCalculator` (no database access, fully unit-tested) and are configured with
+`app.pricing.*`. The defaults reproduce the original fixed prices.
+
+| Step | Rule | Setting (default) |
+|------|------|-------------------|
+| 1. Grace period | A stay of at most N minutes is free. The bill is still created (one bill per ticket), already settled, with payment method `NO_CHARGE`. | `grace-period-minutes` (0 = off) |
+| 2. Billable hours | Every started hour counts, minimum one hour. | |
+| 3. Base amount | `HOURLY`: hours x rate. `SLAB`: each hour at the factor of its band, counted from the start of the stay. | `mode` (HOURLY), `slabs` (1 h 100%, to 3 h 90%, to 8 h 80%, then 70%) |
+| 4. Daily cap | The base never exceeds cap hours x rate per started 24 hours. | `daily-cap-hours` (0 = off) |
+| 5. Tax | Base x tax rate. Amounts are rounded to 2 decimals, half up. | `tax-rate` (0.10) |
+
+Settings are validated at startup (tax between 0 and 1, increasing slab bands with an open-ended last band, factors in
+(0, 1], cap at most 24 hours): a wrong setting stops the app instead of billing customers wrongly.
+
+The bill created on exit uses `app.pricing.mode`. The admin endpoints `generate-hourly` / `generate-slab` bill a
+closed ticket that has no bill yet with an explicit mode.
+
 - One bill per ticket (checked in the service and enforced by a unique constraint on `bills.ticket_id`).
 - Invoice numbers are `INV-<UUID>`.
+
+## Slot types and vehicles
+
+| Slot type | Accepts | Recommended for |
+|-----------|---------|-----------------|
+| `NORMAL` | CAR, EV | CAR, EV (after a charging bay) |
+| `VIP`, `HANDICAPPED` | CAR, EV | never suggested automatically |
+| `EV_CHARGING` | EV only, so a parked petrol car cannot block a charger | EV (first choice) |
+| `BIKE` | BIKE only; bikes do not take car bays | BIKE |
+
+The rule lives in `SlotType.accepts(VehicleType)` and is checked at vehicle entry (400 if the vehicle does not fit)
+and when reserving (the driver needs an active vehicle that fits the space).
+
+## Lists and responses
+
+Every list that can grow is paginated with Spring Data `Pageable` and returned as `PageResponse`
+(`{content, page, size, totalElements, totalPages, last}`). `Pagination.of` validates `page` and `size` (max 100),
+and each endpoint uses a fixed sort that ends with the primary key, so the order is total and pages are stable.
+Controllers return DTOs only; entities never leave the service layer.

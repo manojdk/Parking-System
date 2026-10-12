@@ -1,5 +1,7 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -56,4 +58,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 	@Query("SELECT r.reservationId FROM Reservation r WHERE r.status = com.parkingSystem.enums.ReservationStatus.ACTIVE"
 			+ " AND r.expiresAt <= :now ORDER BY r.expiresAt")
 	List<Long> findExpiredActiveIds(@Param("now") LocalDateTime now);
+
+	// ---- paginated (step 6)
+
+	Page<Reservation> findAllByUserUserId(Long userId, Pageable pageable);
 }

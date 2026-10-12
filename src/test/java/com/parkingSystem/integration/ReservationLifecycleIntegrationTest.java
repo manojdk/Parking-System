@@ -35,7 +35,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void ownerCanDriveIntoTheSpaceTheyReservedAndTheReservationIsFulfilled() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long spaceId = createSpace(admin);
 
@@ -62,8 +62,8 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void anotherDriverCannotTakeAReservedSpaceAndItIsNotListedAsFree() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
-        Session bob = registerAndLogin();
+        Session alice = driver();
+        Session bob = driver();
         Long bobsCar = registerVehicle(bob);
         Long spaceId = createSpace(admin);
         reserve(alice, spaceId).andExpect(status().isCreated());
@@ -77,9 +77,9 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.isAvailable").value(false));
         mockMvc.perform(get("/api/parkingspace/available"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.parkingSpaceId == " + spaceId + ")]").isEmpty());
+                .andExpect(jsonPath("$.content[?(@.parkingSpaceId == " + spaceId + ")]").isEmpty());
         mockMvc.perform(get("/api/parkingspace/available").param("availabilityStatus", "reserved"))
-                .andExpect(jsonPath("$[?(@.parkingSpaceId == " + spaceId + ")]").isNotEmpty());
+                .andExpect(jsonPath("$.content[?(@.parkingSpaceId == " + spaceId + ")]").isNotEmpty());
     }
 
     // ---------------------------------------------------------------- expiry
@@ -87,7 +87,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void noShowIsExpiredByTheJobAndTheSpaceIsFreed() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
 
@@ -105,8 +105,8 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void holdThatRanOutDoesNotBlockOtherDriversEvenBeforeTheJobRuns() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
-        Session bob = registerAndLogin();
+        Session alice = driver();
+        Session bob = driver();
         Long bobsCar = registerVehicle(bob);
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
@@ -120,7 +120,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void ownerArrivingAfterTheHoldStillGetsInIfTheSpaceIsFree() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
@@ -136,7 +136,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void aUserHoldsAtMostOneSpaceButAnExpiredHoldDoesNotBlockTheNextOne() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long first = createSpace(admin);
         Long second = createSpace(admin);
         Long firstReservation = longAt(reserve(alice, first).andReturn(), "$.reservation.reservationId");
@@ -158,8 +158,8 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void cancellingReleasesTheSpaceAndKeepsTheRecord() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
-        Session bob = registerAndLogin();
+        Session alice = driver();
+        Session bob = driver();
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
 
@@ -182,8 +182,8 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void movingAReservationSwapsTheSpacesButDoesNotExtendTheHold() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
-        Session bob = registerAndLogin();
+        Session alice = driver();
+        Session bob = driver();
         Long bobsCar = registerVehicle(bob);
         Long first = createSpace(admin);
         Long second = createSpace(admin);
@@ -215,7 +215,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void durationIsLimitedToOneDay() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long spaceId = createSpace(admin);
 
         mockMvc.perform(post("/api/reservation/register").header("Authorization", alice.bearer())
@@ -230,7 +230,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void feedbackIsOnlyAcceptedOnceForAReservationThatWasUsed() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
@@ -246,7 +246,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void overlongFeedbackCommentIsA400NotADatabaseError() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long spaceId = createSpace(admin);
         Long reservationId = longAt(reserve(alice, spaceId).andReturn(), "$.reservation.reservationId");
@@ -264,7 +264,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void adminCanOnlyToggleAvailableAndOutOfServiceAndNotWhileTheSpaceIsInUse() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long spaceId = createSpace(admin);
 
@@ -290,7 +290,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void removingASpaceWithHistoryDeactivatesItAndAnUnusedSpaceIsDeleted() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long vehicleId = registerVehicle(alice);
         Long used = createSpace(admin);
         Long unused = createSpace(admin);
@@ -319,7 +319,7 @@ class ReservationLifecycleIntegrationTest extends IntegrationTestSupport {
     @Test
     void reservationExpiryUsesTheConfiguredHold() throws Exception {
         String admin = createAdmin();
-        Session alice = registerAndLogin();
+        Session alice = driver();
         Long spaceId = createSpace(admin);
         LocalDateTime before = LocalDateTime.now(clock).withNano(0);
 

@@ -1,14 +1,18 @@
 package com.parkingSystem.service;
 
+import com.parkingSystem.dto.AvailabilitySummaryDTO;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.enums.SlotType;
-import com.parkingSystem.service.impl.SlotAllocationServiceImpl;
+import com.parkingSystem.enums.VehicleType;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Service interface for intelligent slot allocation
+ * Read-only slot lookups for drivers. Nothing here changes a space; entry and reservations do that.
  */
 public interface ISlotAllocationService {
 
@@ -17,30 +21,22 @@ public interface ISlotAllocationService {
      */
     Optional<ParkingSpace> findNearestAvailableSlot(String location, SlotType slotType);
 
-    /**
-     * Find available slot by type only
-     */
-    List<ParkingSpace> findAvailableSlotsByType(SlotType slotType);
+    Page<ParkingSpace> findAvailableSlotsByType(SlotType slotType, Pageable pageable);
+
+    Page<ParkingSpace> findAvailableSlotsByLocation(String location, Pageable pageable);
+
+    Page<ParkingSpace> getAllAvailableSlots(Pageable pageable);
 
     /**
-     * Find available slots by location
+     * Free spaces per slot type
      */
-    List<ParkingSpace> findAvailableSlotsByLocation(String location);
+    AvailabilitySummaryDTO getAvailabilitySummary();
 
     /**
-     * Find all available slots
+     * Nearest free slot at the location that suits the vehicle, trying its recommended slot types in order
+     * (for an EV: a charging bay first, then a normal one).
      */
-    List<ParkingSpace> getAllAvailableSlots();
-
-    /**
-     * Get availability summary
-     */
-    SlotAllocationServiceImpl.AvailabilitySummary getAvailabilitySummary();
-
-    /**
-     * Recommend slot based on vehicle type
-     */
-    Optional<ParkingSpace> recommendSlot(String location, String vehicleType);
+    Optional<ParkingSpace> recommendSlot(String location, VehicleType vehicleType);
 
     /**
      * Check if slot is available (in service and AVAILABLE)

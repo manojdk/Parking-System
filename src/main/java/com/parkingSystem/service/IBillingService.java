@@ -1,8 +1,10 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.parkingSystem.model.Bill;
+import com.parkingSystem.pricing.PricingMode;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -11,14 +13,14 @@ import java.util.Optional;
 public interface IBillingService {
 
     /**
-     * Generate bill for a parking ticket (hourly billing)
+     * Bill a closed ticket with the configured pricing mode ({@code app.pricing.mode}); used on vehicle exit
      */
     Bill generateBill(Long ticketId);
 
     /**
-     * Generate bill with slab-based pricing
+     * Bill a closed, not yet billed ticket with the given pricing mode
      */
-    Bill generateBillWithSlabPricing(Long ticketId);
+    Bill generateBill(Long ticketId, PricingMode mode);
 
     /**
      * Record a payment made outside the app (for example cash at the counter). Admin only; refused while an
@@ -46,12 +48,12 @@ public interface IBillingService {
     /**
      * Get user's bills
      */
-    List<Bill> getUserBills(Long userId);
+    Page<Bill> getUserBills(Long userId, Pageable pageable);
 
     /**
      * Get pending bills for user
      */
-    List<Bill> getUserPendingBills(Long userId);
+    Page<Bill> getUserPendingBills(Long userId, Pageable pageable);
 
     /**
      * Apply discount to bill
@@ -61,7 +63,7 @@ public interface IBillingService {
     /**
      * Get all pending bills
      */
-    List<Bill> getAllPendingBills();
+    Page<Bill> getAllPendingBills(Pageable pageable);
 
     /**
      * Get total revenue

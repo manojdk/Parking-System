@@ -38,12 +38,15 @@
 - Online payments through a mock provider: idempotency keys, HMAC-signed and timestamped webhooks, one payment in
   progress per bill, timeouts, duplicate and late webhooks (refund flag); cash payments are admin-only
 
+## Done: API clean-up and real-world rules (steps 6-7)
+
+- Every growing list is paginated with one page shape and a stable sort; all responses are DTOs; revenue is a SQL `SUM`
+- `EV_CHARGING` and `BIKE` slot types; vehicles only park in (and reserve) slots they fit; vehicle-aware recommendations
+- Configurable pricing: mode, tax rate, slab bands, grace period, daily cap, validated at startup
+
 ## Next
 
 - Process `REFUND_REQUIRED` payments (refund through the provider) and expire timed-out payments with a job
-- Response DTOs for every endpoint (parking spaces and slots still return entities)
-- Pagination for list endpoints
 - Reservations for a future time slot (needs overlap checks against walk-ins)
-- Configurable pricing and tax
 - JWT subject based on user id (so renaming a user does not invalidate tokens), refresh tokens
-- Use the vehicle type in slot recommendations
+- Membership / permit checks for VIP and HANDICAPPED bays
