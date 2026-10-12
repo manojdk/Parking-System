@@ -11,6 +11,7 @@ import com.parkingSystem.model.ParkingTicket;
 import com.parkingSystem.model.User;
 import com.parkingSystem.repository.BillRepository;
 import com.parkingSystem.repository.ParkingTicketRepository;
+import com.parkingSystem.service.IPaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,13 +47,16 @@ class BillingServiceImplTest {
     @Mock
     private ParkingTicketRepository parkingTicketRepository;
 
+    @Mock
+    private IPaymentService paymentService;
+
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-12T10:00:00Z"), ZoneOffset.UTC);
 
     private BillingServiceImpl billingService;
 
     @BeforeEach
     void setUp() {
-        billingService = new BillingServiceImpl(billRepository, parkingTicketRepository, clock);
+        billingService = new BillingServiceImpl(billRepository, parkingTicketRepository, clock, paymentService);
         lenient().when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -157,7 +161,7 @@ class BillingServiceImplTest {
     @Test
     void paidBillCannotBePaidAgain() {
         Bill bill = Bill.builder().billId(1L).status(BillingStatus.PAID).build();
-        when(billRepository.findById(1L)).thenReturn(Optional.of(bill));
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
 
         assertThatThrownBy(() -> billingService.markBillAsPaid(1L, "CARD")).isInstanceOf(ConflictException.class);
     }
@@ -166,7 +170,7 @@ class BillingServiceImplTest {
     void discountCannotExceedBillAmount() {
         Bill bill = Bill.builder().billId(1L).status(BillingStatus.PENDING)
                 .baseAmount(new BigDecimal("10.00")).taxAmount(new BigDecimal("1.00")).build();
-        when(billRepository.findById(1L)).thenReturn(Optional.of(bill));
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
 
         assertThatThrownBy(() -> billingService.applyDiscount(1L, new BigDecimal("12.00")))
                 .isInstanceOf(BadRequestException.class);
@@ -176,11 +180,46 @@ class BillingServiceImplTest {
     void discountReducesTotal() {
         Bill bill = Bill.builder().billId(1L).status(BillingStatus.PENDING)
                 .baseAmount(new BigDecimal("10.00")).taxAmount(new BigDecimal("1.00")).build();
-        when(billRepository.findById(1L)).thenReturn(Optional.of(bill));
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
 
         Bill updated = billingService.applyDiscount(1L, new BigDecimal("2.00"));
 
         assertThat(updated.getTotalAmount()).isEqualByComparingTo("9.00");
+    }
+
+    @Test
+    void cashPaymentMarksThePendingBillPaid() {
+        Bill bill = Bill.builder().billId(1L).status(BillingStatus.PENDING).build();
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
+
+        Bill paid = billingService.markBillAsPaid(1L, "CASH");
+
+        assertThat(paid.getStatus()).isEqualTo(BillingStatus.PAID);
+        assertThat(paid.getPaymentMethod()).isEqualTo("CASH");
+        assertThat(paid.getPaymentDate()).isEqualTo(LocalDateTime.of(2026, 10, 12, 10, 0));
+    }
+
+    @Test
+    void cashPaymentIsRefusedWhileAnOnlinePaymentIsInProgress() {
+        Bill bill = Bill.builder().billId(1L).status(BillingStatus.PENDING).build();
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
+        when(paymentService.hasPaymentInProgress(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> billingService.markBillAsPaid(1L, "CASH")).isInstanceOf(ConflictException.class);
+        assertThat(bill.getStatus()).isEqualTo(BillingStatus.PENDING);
+    }
+
+    @Test
+    void discountIsRefusedWhileAnOnlinePaymentIsInProgress() {
+        Bill bill = Bill.builder().billId(1L).status(BillingStatus.PENDING)
+                .baseAmount(new BigDecimal("10.00")).taxAmount(new BigDecimal("1.00"))
+                .totalAmount(new BigDecimal("11.00")).build();
+        when(billRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(bill));
+        when(paymentService.hasPaymentInProgress(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> billingService.applyDiscount(1L, new BigDecimal("2.00")))
+                .isInstanceOf(ConflictException.class);
+        assertThat(bill.getTotalAmount()).isEqualByComparingTo("11.00");
     }
 
     private void givenClosedTicket(long durationMinutes) {

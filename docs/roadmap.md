@@ -33,10 +33,14 @@
 - Injected `Clock`; feedback only for used reservations, once; removed the unused `allocateSlot`/`releaseSlot`
   methods that changed a space's status without a ticket; spaces with history are deactivated, not deleted
 
+## Done: payments (step 5)
+
+- Online payments through a mock provider: idempotency keys, HMAC-signed and timestamped webhooks, one payment in
+  progress per bill, timeouts, duplicate and late webhooks (refund flag); cash payments are admin-only
+
 ## Next
 
-- Payment confirmation: users should not be able to mark their own bills as paid (admin confirmation or a mock
-  payment provider with an idempotency key)
+- Process `REFUND_REQUIRED` payments (refund through the provider) and expire timed-out payments with a job
 - Response DTOs for every endpoint (parking spaces and slots still return entities)
 - Pagination for list endpoints
 - Reservations for a future time slot (needs overlap checks against walk-ins)

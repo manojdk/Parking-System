@@ -6,6 +6,7 @@ import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.model.*;
 import com.parkingSystem.repository.BillRepository;
 import com.parkingSystem.repository.ParkingTicketRepository;
+import com.parkingSystem.service.IPaymentService;
 import com.parkingSystem.enums.BillingStatus;
 import com.parkingSystem.enums.TicketStatus;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,7 @@ public class BillingServiceImpl implements com.parkingSystem.service.IBillingSer
     private BillRepository billRepository;
     private ParkingTicketRepository parkingTicketRepository;
     private Clock clock;
+    private IPaymentService paymentService;
 
     /**
      * Generate bill for a parking ticket (hourly billing)
@@ -172,7 +174,8 @@ public class BillingServiceImpl implements com.parkingSystem.service.IBillingSer
     }
 
     /**
-     * Mark bill as paid
+     * Record an offline payment (admin). The bill row is locked so this cannot race an online payment's
+     * webhook; it is refused while an online payment is still in progress.
      */
     @Transactional
     public Bill markBillAsPaid(Long billId, String paymentMethod) {
@@ -181,9 +184,12 @@ public class BillingServiceImpl implements com.parkingSystem.service.IBillingSer
             throw new BadRequestException("paymentMethod is mandatory");
         }
 
-        Bill bill = getBillById(billId);
+        Bill bill = lockBill(billId);
         if (bill.getStatus() != BillingStatus.PENDING) {
             throw new ConflictException("Bill cannot be paid. Current status: " + bill.getStatus());
+        }
+        if (paymentService.hasPaymentInProgress(billId)) {
+            throw new ConflictException("An online payment for this bill is in progress");
         }
 
         bill.setStatus(BillingStatus.PAID);
@@ -193,6 +199,11 @@ public class BillingServiceImpl implements com.parkingSystem.service.IBillingSer
         Bill updatedBill = billRepository.save(bill);
         log.info("Bill marked as paid successfully");
         return updatedBill;
+    }
+
+    private Bill lockBill(Long billId) {
+        return billRepository.findByIdForUpdate(billId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bill not found with ID: " + billId));
     }
 
     /**
@@ -244,9 +255,13 @@ public class BillingServiceImpl implements com.parkingSystem.service.IBillingSer
             throw new BadRequestException("Discount amount must be zero or positive");
         }
 
-        Bill bill = getBillById(billId);
+        Bill bill = lockBill(billId);
         if (bill.getStatus() != BillingStatus.PENDING) {
             throw new ConflictException("Discount can only be applied to pending bills");
+        }
+        // The provider is charging the current total; changing it now would make the payment not match the bill
+        if (paymentService.hasPaymentInProgress(billId)) {
+            throw new ConflictException("Cannot change the amount while an online payment is in progress");
         }
 
         BigDecimal grossAmount = bill.getBaseAmount().add(bill.getTaxAmount());

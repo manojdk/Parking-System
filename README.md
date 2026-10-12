@@ -26,7 +26,12 @@ This is a personal learning/portfolio project. It is not deployed anywhere and i
   simultaneous requests at one space.
 - **Billing** - hourly pricing (every started hour counts, minimum one hour) plus 10% tax, one bill per ticket,
   UUID-based invoice numbers. Admins can also bill with slab pricing (100% / 90% / 80% / 70% by duration band),
-  apply discounts and see pending bills and total revenue. Users mark their bills as paid.
+  apply discounts, record cash payments and see pending bills and total revenue.
+- **Online payments** - users pay through a payment provider (a mock one here). Starting a payment needs an
+  `Idempotency-Key`, so a retried request never charges twice; the bill becomes PAID only when the provider
+  confirms through an HMAC-signed, timestamped webhook. Covers duplicate webhooks, failed and timed-out
+  payments, and late confirmations (flagged for refund instead of paying twice). Users can no longer mark
+  their own bills as paid.
 - **Reservations** - hold a free space for 30 minutes (configurable). The reservation is fulfilled when the driver
   drives in, can be moved or cancelled, and expires on a no-show (a scheduled job frees the space; an overdue hold
   never blocks anyone even before the job runs). One active reservation per user.
@@ -95,6 +100,9 @@ All secrets come from environment variables. Copy `.env.example` to `.env` and f
 | `RESERVATION_HOLD_MINUTES` | no | how long a reservation holds a space, default 30 |
 | `RESERVATION_EXPIRY_CHECK_MS` | no | how often no-show reservations are expired, default 60000 (1 min) |
 | `CORS_ALLOWED_ORIGINS` | no | comma-separated frontend origins, default `http://localhost:3000` |
+| `PAYMENT_WEBHOOK_SECRET` | yes | HMAC key shared with the payment provider for webhook signatures, at least 32 characters |
+| `PAYMENT_TIMEOUT_MINUTES` | no | how long a payment may wait for the provider's confirmation, default 15 |
+| `PAYMENT_MOCK_ENABLED` | no | serve the mock provider's checkout endpoints, default `true`; set `false` with a real provider |
 | `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | no | if all three are set, an `ADMIN` account is created on startup (skipped if it already exists) |
 
 There is no separate admin sign-up: set the three `ADMIN_*` variables to get the first admin account.
@@ -149,7 +157,10 @@ curl localhost:8080/api/slots/availability-summary
 | Entry / exit | `/api/parking` (`entry`, `exit`, `cancel`, `ticket/{ref}`, `history/{userId}`, `user-active/{userId}`) | owner or admin; `GET /occupancy` public; `GET /active-sessions` admin |
 | Parking spaces | `/api/parkingspace` | admin; `GET /available` public |
 | Slot lookup | `GET /api/slots/...` | public |
-| Billing | `/api/billing` | `invoice`, `user/{id}`, `pay` owner or admin; generate, discount, `pending-all`, `revenue-total` admin |
+| Billing | `/api/billing` | `invoice`, `user/{id}` owner or admin; generate, discount, `pay` (cash), `pending-all`, `revenue-total` admin |
+| Payments | `POST /api/payments` (header `Idempotency-Key`), `GET /api/payments/{id}`, `GET /api/payments/bill/{billId}` | bill owner (start); owner or admin (read) |
+| Payment webhook | `POST /api/payments/webhook` | the provider; no JWT, HMAC signature required |
+| Mock provider | `POST /api/mock-provider/checkout/{providerReference}?outcome=SUCCEEDED\|FAILED` | the payer or admin |
 | Reservations | `/api/reservation` (`register`, `details`, `user`, `update`, `remove` = cancel) | owner or admin; `GET /all/details` admin |
 | Feedback | `/api/feedback` | owner or admin; `GET /all/details` admin |
 
@@ -167,6 +178,8 @@ the logged-in user.
   another user's data returns `403`. Passwords can only be changed by the account owner.
 - **Passwords** are stored as BCrypt hashes and are never included in responses.
 - **CORS** is configured centrally in `CorsConfig`.
+- **Payment webhooks** are public but trusted only with a valid HMAC-SHA256 signature over the timestamp and the raw
+  body; timestamps older than 5 minutes are rejected (no replays) and signatures are compared in constant time.
 
 ## Testing
 
@@ -188,7 +201,11 @@ secret. Time-based rules use an injected `Clock`, so tests move time forward ins
   extending the hold, feedback rules, admin status changes and removal of spaces.
 - **Concurrency** (`ConcurrencyIntegrationTest`): eight simultaneous entries or reservations for one space give
   exactly one success and seven 409s; a reservation racing a walk-in gives exactly one winner; the database
-  rejects a second active ticket for a space or vehicle even when the service is bypassed.
+  rejects a second active ticket for a space or vehicle even when the service is bypassed; eight simultaneous
+  payment attempts for one bill start exactly one payment.
+- **Payments** (`PaymentIntegrationTest`, `WebhookSignerTest`): idempotent retries, only the webhook settles the bill,
+  ownership, one payment at a time and timeouts, failed payments, late confirmations flagged for refund, webhook
+  signature / replay / duplicate / conflicting deliveries, and admin actions blocked during an online payment.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `./mvnw -B verify` on JDK 17 for every push and pull request,
 twice: once on H2 and once against a real PostgreSQL 16 service container, so the migrations, row locks and
@@ -199,8 +216,9 @@ constraints are also proven on the production database engine.
 Known gaps, kept here deliberately rather than hidden:
 
 - Reservations hold a space from now; booking a space for a later time slot is not supported.
-- Tax (10%) and slab percentages are hard-coded; "paid" is only a status, there is no payment provider, and a user
-  can mark their own bill as paid.
+- Tax (10%) and slab percentages are hard-coded.
+- Payments use a mock provider; refunds flagged `REFUND_REQUIRED` are not processed automatically, and timed-out
+  payments are expired lazily (on the next attempt or confirmation), not by a job.
 - Some responses (parking spaces, slots) still return JPA entities instead of response DTOs.
 - JWTs are bound to the username and cannot be revoked; changing your user name requires logging in again.
 - `GET /api/slots/recommend` ignores the vehicle type and returns the nearest `NORMAL` slot.

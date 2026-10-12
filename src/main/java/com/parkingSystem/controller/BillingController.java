@@ -107,13 +107,14 @@ public class BillingController {
     }
 
     /**
-     * Mark bill as paid (bill owner or admin)
+     * Record an offline payment, e.g. cash at the counter (admin only). Users pay online through
+     * {@code POST /api/payments}; they can no longer mark their own bills as paid.
      */
     @PutMapping("/{billId}/pay")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> markBillAsPaid(@PathVariable Long billId,
                                             @RequestParam String paymentMethod) {
-        log.info("Marking bill ID: {} as paid", billId);
-        currentUserService.checkAccess(billingService.getBillById(billId).getUser().getUserId());
+        log.info("Recording offline payment for bill ID: {}", billId);
         Bill bill = billingService.markBillAsPaid(billId, paymentMethod);
 
         Map<String, Object> response = new HashMap<>();
