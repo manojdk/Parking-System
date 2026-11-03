@@ -1,8 +1,9 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.model.Vehicle;
 import com.parkingSystem.enums.VehicleType;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,7 +30,7 @@ public interface IVehicleService {
     /**
      * Get all vehicles for a user
      */
-    List<Vehicle> getUserVehicles(Long userId);
+    Page<Vehicle> getUserVehicles(Long userId, Pageable pageable);
 
     /**
      * Update vehicle details
@@ -44,5 +45,5 @@ public interface IVehicleService {
     /**
      * Get all active vehicles
      */
-    List<Vehicle> getAllActiveVehicles();
+    Page<Vehicle> getAllActiveVehicles(Pageable pageable);
 }

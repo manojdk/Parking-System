@@ -1,5 +1,7 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.parkingSystem.model.Vehicle;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -22,5 +24,10 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     Optional<Vehicle> findByRegistrationNumber(String registrationNumber);
 
     List<Vehicle> findByIsActiveTrue();
-}
 
+    // ---- paginated (step 6)
+
+    Page<Vehicle> findByUserUserId(Long userId, Pageable pageable);
+
+    Page<Vehicle> findByIsActiveTrue(Pageable pageable);
+}

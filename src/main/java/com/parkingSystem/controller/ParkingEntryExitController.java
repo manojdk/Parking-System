@@ -1,5 +1,8 @@
 package com.parkingSystem.controller;
 
+import org.springframework.data.domain.Sort;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import com.parkingSystem.dto.BillDTO;
 import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.security.CurrentUserService;
@@ -88,35 +91,23 @@ public class ParkingEntryExitController {
      */
     @GetMapping("/active-sessions")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getActiveSessions() {
-        List<ParkingTicket> activeTickets = parkingEntryExitService.getActiveTickets();
-        List<ParkingTicketDTO> dtos = activeTickets.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("count", activeTickets.size());
-        response.put("activeParking", dtos);
-        return ResponseEntity.ok(response);
+    public PageResponse<ParkingTicketDTO> getActiveSessions(
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+        return PageResponse.of(parkingEntryExitService.getActiveTickets(
+                Pagination.of(page, size, Sort.by("entryTime", "ticketId"))), this::convertToDTO);
     }
 
     /**
      * Get user's parking history
      */
     @GetMapping("/history/{userId}")
-    public ResponseEntity<?> getUserParkingHistory(@PathVariable Long userId) {
+    public PageResponse<ParkingTicketDTO> getUserParkingHistory(@PathVariable Long userId,
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
         currentUserService.checkAccess(userId);
-        List<ParkingTicket> history = parkingEntryExitService.getUserParkingHistory(userId);
-        List<ParkingTicketDTO> dtos = history.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("count", history.size());
-        response.put("parkingHistory", dtos);
-        return ResponseEntity.ok(response);
+        return PageResponse.of(parkingEntryExitService.getUserParkingHistory(userId,
+                Pagination.of(page, size, Sort.by(Sort.Direction.DESC, "exitTime", "ticketId"))), this::convertToDTO);
     }
 
     /**

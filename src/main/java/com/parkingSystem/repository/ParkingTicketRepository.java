@@ -1,5 +1,7 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.parkingSystem.model.ParkingTicket;
 import com.parkingSystem.enums.TicketStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -51,5 +53,10 @@ public interface ParkingTicketRepository extends JpaRepository<ParkingTicket, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT pt FROM ParkingTicket pt WHERE pt.ticketReference = :reference")
     Optional<ParkingTicket> findByTicketReferenceForUpdate(@Param("reference") String ticketReference);
-}
 
+    // ---- paginated (step 6)
+
+    Page<ParkingTicket> findByStatusAndExitTimeIsNull(TicketStatus status, Pageable pageable);
+
+    Page<ParkingTicket> findByUserUserIdAndStatus(Long userId, TicketStatus status, Pageable pageable);
+}

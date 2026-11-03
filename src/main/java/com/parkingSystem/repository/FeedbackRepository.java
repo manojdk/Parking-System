@@ -1,7 +1,8 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -23,4 +24,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 	Feedback findByFeedbackId(Long feedbackId);
 
 	void deleteByFeedbackId(Long feedbackId);
+
+	// ---- paginated (step 6)
+
+	Page<Feedback> findAllByUserUserId(Long userId, Pageable pageable);
 }

@@ -1,5 +1,7 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,4 +69,21 @@ public interface ParkingSpaceRepository extends JpaRepository<ParkingSpace, Long
 
 	@Query("SELECT p FROM ParkingSpace p WHERE p.location = :location AND p.slotType = :slotType AND p.availabilityStatus = com.parkingSystem.enums.SpaceStatus.AVAILABLE AND p.isActive = true ORDER BY p.floorNumber ASC")
     List<ParkingSpace> findNearestAvailableSlots(@Param("location") String location, @Param("slotType") SlotType slotType);
+
+	// ---- paginated (step 6)
+
+	Page<ParkingSpace> findByAvailabilityStatusAndIsActiveTrue(SpaceStatus availabilityStatus, Pageable pageable);
+
+	@Query("SELECT p FROM ParkingSpace p WHERE p.availabilityStatus = com.parkingSystem.enums.SpaceStatus.AVAILABLE AND p.isActive = true")
+	Page<ParkingSpace> findAvailableParkingSpaces(Pageable pageable);
+
+	@Query("SELECT p FROM ParkingSpace p WHERE p.slotType = :slotType AND p.availabilityStatus = com.parkingSystem.enums.SpaceStatus.AVAILABLE AND p.isActive = true")
+	Page<ParkingSpace> findAvailableBySlotType(@Param("slotType") SlotType slotType, Pageable pageable);
+
+	@Query("SELECT p FROM ParkingSpace p WHERE p.location = :location AND p.availabilityStatus = com.parkingSystem.enums.SpaceStatus.AVAILABLE AND p.isActive = true")
+	Page<ParkingSpace> findAvailableByLocation(@Param("location") String location, Pageable pageable);
+
+	/** Free, in-service spaces per slot type, as [SlotType, count] rows (types with none are absent). */
+	@Query("SELECT p.slotType, COUNT(p) FROM ParkingSpace p WHERE p.availabilityStatus = com.parkingSystem.enums.SpaceStatus.AVAILABLE AND p.isActive = true GROUP BY p.slotType")
+	List<Object[]> countAvailableGroupedBySlotType();
 }

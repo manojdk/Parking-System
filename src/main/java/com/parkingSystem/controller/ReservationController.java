@@ -1,5 +1,8 @@
 package com.parkingSystem.controller;
 
+import org.springframework.data.domain.Sort;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import com.parkingSystem.dto.CreateReservationRequest;
 import com.parkingSystem.dto.ReservationDTO;
 import com.parkingSystem.dto.UpdateReservationRequest;
@@ -13,9 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,16 +24,19 @@ import java.util.Map;
 @AllArgsConstructor
 public class ReservationController {
 
+	private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "reservationTime", "reservationId");
+
 	private IReservationService reservationService;
 
 	private CurrentUserService currentUserService;
 
 	@GetMapping("/all/details")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Object> getAllReservations() {
-		List<ReservationDTO> reservations = reservationService.getAllReservations().stream()
-				.map(ReservationDTO::from).toList();
-		return ResponseEntity.ok(reservations);
+	public PageResponse<ReservationDTO> getAllReservations(
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+		return PageResponse.of(reservationService.getAllReservations(Pagination.of(page, size, NEWEST_FIRST)),
+				ReservationDTO::from);
 	}
 
 	@PostMapping("/register")
@@ -57,11 +61,12 @@ public class ReservationController {
 	}
 
 	@GetMapping("/user")
-	public ResponseEntity<Object> getReservationsByUserId(@RequestParam Long userId) {
+	public PageResponse<ReservationDTO> getReservationsByUserId(@RequestParam Long userId,
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
 		currentUserService.checkAccess(userId);
-		List<ReservationDTO> reservations = reservationService.getReservationsByUserId(userId).stream()
-				.map(ReservationDTO::from).toList();
-		return ResponseEntity.ok(reservations);
+		return PageResponse.of(reservationService.getReservationsByUserId(userId,
+				Pagination.of(page, size, NEWEST_FIRST)), ReservationDTO::from);
 	}
 
 	@PutMapping("/update")

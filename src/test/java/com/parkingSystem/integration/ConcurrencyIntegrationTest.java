@@ -101,6 +101,7 @@ class ConcurrencyIntegrationTest {
         List<Callable<Object>> attempts = new ArrayList<>();
         for (int i = 0; i < DRIVERS; i++) {
             User driver = newUser();
+            newVehicle(driver);
             attempts.add(() -> reservationService.createReservation(driver.getUserId(), space.getParkingSpaceId(), 1));
         }
 
@@ -120,6 +121,7 @@ class ConcurrencyIntegrationTest {
     void reservingAndDrivingInAtTheSameMomentNeverGivesBoth() throws Exception {
         ParkingSpace space = newSpace();
         User reserver = newUser();
+        newVehicle(reserver);
         User walkIn = newUser();
         Vehicle walkInCar = newVehicle(walkIn);
 
