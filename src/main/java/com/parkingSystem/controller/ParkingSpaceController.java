@@ -1,5 +1,8 @@
 package com.parkingSystem.controller;
 
+import com.parkingSystem.dto.ParkingSpaceDTO;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,23 +40,24 @@ public class ParkingSpaceController {
 
 	@GetMapping(value = "/all/details")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Object> getAllParkingSpaces() {
-		List<ParkingSpace> parkingSpaces = parkingSpaceService.getAllParkingSpaces();
-		return ResponseEntity.ok(parkingSpaces);
+	public PageResponse<ParkingSpaceDTO> getAllParkingSpaces(
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+		return PageResponse.of(parkingSpaceService.getAllParkingSpaces(
+				Pagination.of(page, size, SlotAllocationController.BY_FLOOR_AND_NUMBER)), ParkingSpaceDTO::from);
 	}
 
 	@GetMapping("/details/id")
 	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<Object> getParkingSpaceDetails(@RequestParam Long parkingSpaceId) {
-		Map<String, Object> parkingSpaceDetails = parkingSpaceService.getParkingSpaceDetails(parkingSpaceId);
-		return ResponseEntity.ok(parkingSpaceDetails);
+	public ResponseEntity<ParkingSpaceDTO> getParkingSpaceDetails(@RequestParam Long parkingSpaceId) {
+		return ResponseEntity.ok(ParkingSpaceDTO.from(parkingSpaceService.getParkingSpaceDetails(parkingSpaceId)));
 	}
 
 	@PostMapping("/register")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<Object> addParkingSpace(@Valid @RequestBody ParkingSpaceRequest request) {
 		ParkingSpace addedParkingSpace = parkingSpaceService.addParkingSpace(toEntity(request));
-		return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpace);
+		return ResponseEntity.status(HttpStatus.CREATED).body(ParkingSpaceDTO.from(addedParkingSpace));
 	}
 
 	@PostMapping("/register/multiple")
@@ -62,7 +66,8 @@ public class ParkingSpaceController {
 			@RequestBody List<@Valid ParkingSpaceRequest> parkingSpaceRequests) {
 		List<ParkingSpace> addedParkingSpaces = parkingSpaceService
 				.addMultipleParkingSpaces(parkingSpaceRequests.stream().map(ParkingSpaceController::toEntity).toList());
-		return ResponseEntity.status(HttpStatus.CREATED).body(addedParkingSpaces);
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(addedParkingSpaces.stream().map(ParkingSpaceDTO::from).toList());
 	}
 
 	@PutMapping("/update")
@@ -70,7 +75,7 @@ public class ParkingSpaceController {
 	public ResponseEntity<Object> updateParkingSpace(@Valid @RequestBody UpdateParkingSpaceRequest request) {
 		ParkingSpace updatedParkingSpace = parkingSpaceService.updateParkingSpace(request.getParkingSpaceId(),
 				request.getLocation(), request.getType(), request.getRate(), request.getStatus());
-		return ResponseEntity.ok(updatedParkingSpace);
+		return ResponseEntity.ok(ParkingSpaceDTO.from(updatedParkingSpace));
 	}
 
 	@DeleteMapping("/remove")
@@ -87,11 +92,12 @@ public class ParkingSpaceController {
 	 * Public: lists in-service parking spaces by status (AVAILABLE by default; case-insensitive).
 	 */
 	@GetMapping("/available")
-	public ResponseEntity<Object> getAvailableParkingSpaces(
-			@RequestParam(defaultValue = "AVAILABLE") String availabilityStatus) {
-		List<ParkingSpace> availableParkingSpaces = parkingSpaceService
-				.getAvailableParkingSpaces(SpaceStatus.fromValue(availabilityStatus));
-		return ResponseEntity.ok(availableParkingSpaces);
+	public PageResponse<ParkingSpaceDTO> getAvailableParkingSpaces(
+			@RequestParam(defaultValue = "AVAILABLE") String availabilityStatus,
+			@RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+			@RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+		return PageResponse.of(parkingSpaceService.getAvailableParkingSpaces(SpaceStatus.fromValue(availabilityStatus),
+				Pagination.of(page, size, SlotAllocationController.BY_FLOOR_AND_NUMBER)), ParkingSpaceDTO::from);
 	}
 
 	private static ParkingSpace toEntity(ParkingSpaceRequest request) {

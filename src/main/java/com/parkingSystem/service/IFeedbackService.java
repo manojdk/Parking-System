@@ -1,5 +1,7 @@
 package com.parkingSystem.service;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.model.Feedback;
 import java.util.List;
 
@@ -13,7 +15,7 @@ public interface IFeedbackService {
      *
      * @return Feedback data
      */
-    List<Feedback> getAllFeedback();
+    Page<Feedback> getAllFeedback(Pageable pageable);
 
     /**
      * Create new Feedback with parameters
@@ -57,7 +59,7 @@ public interface IFeedbackService {
      * @param userId User ID
      * @return List of feedback
      */
-    List<Feedback> getFeedbacksByUserId(Long userId);
+    Page<Feedback> getFeedbacksByUserId(Long userId, Pageable pageable);
 
     /**
      * Get feedback by reservation ID

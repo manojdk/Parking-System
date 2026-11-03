@@ -9,14 +9,15 @@ import com.parkingSystem.model.Bill;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.model.ParkingTicket;
 import com.parkingSystem.model.User;
+import com.parkingSystem.pricing.PricingCalculator;
+import com.parkingSystem.pricing.PricingMode;
+import com.parkingSystem.pricing.PricingProperties;
 import com.parkingSystem.repository.BillRepository;
 import com.parkingSystem.repository.ParkingTicketRepository;
 import com.parkingSystem.service.IPaymentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,11 +53,15 @@ class BillingServiceImplTest {
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-10-12T10:00:00Z"), ZoneOffset.UTC);
 
+    /** Defaults = the original prices; individual tests change them before billing. */
+    private final PricingProperties pricing = new PricingProperties();
+
     private BillingServiceImpl billingService;
 
     @BeforeEach
     void setUp() {
-        billingService = new BillingServiceImpl(billRepository, parkingTicketRepository, clock, paymentService);
+        billingService = new BillingServiceImpl(billRepository, parkingTicketRepository, clock, paymentService,
+                new PricingCalculator(pricing));
         lenient().when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -88,33 +93,39 @@ class BillingServiceImplTest {
         assertThat(bill.getTotalAmount()).isEqualByComparingTo("11.00");
     }
 
-    @ParameterizedTest
-    @CsvSource({ "0,1", "1,1", "59,1", "60,1", "61,2", "180,3", "-5,1" })
-    void billableHoursHasAMinimumOfOneAndRoundsUp(long minutes, long expectedHours) {
-        assertThat(BillingServiceImpl.billableHours(minutes)).isEqualByComparingTo(String.valueOf(expectedHours));
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-            "1, 10.00",   // first hour full rate
-            "3, 28.00",   // 10 + 2 * 9
-            "5, 44.00",   // 10 + 18 + 2 * 8
-            "10, 82.00"   // 10 + 18 + 40 + 2 * 7
-    })
-    void slabPricingAppliesDecreasingRates(long hours, String expected) {
-        BigDecimal amount = BillingServiceImpl.calculateSlabBasedAmount(BigDecimal.valueOf(hours), RATE);
-        assertThat(amount).isEqualByComparingTo(expected);
-    }
-
     @Test
     void slabBillUsesSlabAmount() {
         givenClosedTicket(5 * 60);
 
-        Bill bill = billingService.generateBillWithSlabPricing(TICKET_ID);
+        Bill bill = billingService.generateBill(TICKET_ID, PricingMode.SLAB);
 
         assertThat(bill.getBaseAmount()).isEqualByComparingTo("44.00");
         assertThat(bill.getTotalAmount()).isEqualByComparingTo("48.40");
         assertThat(bill.getNotes()).contains("Slab");
+    }
+
+    @Test
+    void exitBillUsesTheConfiguredMode() {
+        pricing.setMode(PricingMode.SLAB);
+        givenClosedTicket(5 * 60);
+
+        Bill bill = billingService.generateBill(TICKET_ID);
+
+        assertThat(bill.getBaseAmount()).isEqualByComparingTo("44.00");
+    }
+
+    @Test
+    void stayWithinTheGracePeriodGetsAFreeBillThatIsAlreadySettled() {
+        pricing.setGracePeriodMinutes(10);
+        givenClosedTicket(8);
+
+        Bill bill = billingService.generateBill(TICKET_ID);
+
+        assertThat(bill.getTotalAmount()).isEqualByComparingTo("0");
+        assertThat(bill.getStatus()).isEqualTo(BillingStatus.PAID);
+        assertThat(bill.getPaymentMethod()).isEqualTo("NO_CHARGE");
+        assertThat(bill.getPaymentDate()).isEqualTo(LocalDateTime.of(2026, 10, 12, 10, 0));
+        assertThat(bill.getNotes()).contains("grace period");
     }
 
     @Test
@@ -131,7 +142,7 @@ class BillingServiceImplTest {
         givenClosedTicket(30);
         when(billRepository.existsByParkingTicketTicketId(TICKET_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> billingService.generateBillWithSlabPricing(TICKET_ID))
+        assertThatThrownBy(() -> billingService.generateBill(TICKET_ID, PricingMode.SLAB))
                 .isInstanceOf(ConflictException.class);
         verify(billRepository, never()).save(any());
     }

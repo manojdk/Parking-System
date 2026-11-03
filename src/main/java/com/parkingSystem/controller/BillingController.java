@@ -1,5 +1,9 @@
 package com.parkingSystem.controller;
 
+import com.parkingSystem.pricing.PricingMode;
+import org.springframework.data.domain.Sort;
+import com.parkingSystem.dto.PageResponse;
+import com.parkingSystem.controller.support.Pagination;
 import com.parkingSystem.exception.ResourceNotFoundException;
 import com.parkingSystem.security.CurrentUserService;
 import com.parkingSystem.service.IBillingService;
@@ -14,9 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Controller for Billing and Invoice management
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Slf4j
 public class BillingController {
+
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "billingDate", "billId");
 
     private IBillingService billingService;
     private CurrentUserService currentUserService;
@@ -38,7 +42,7 @@ public class BillingController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> generateBillHourly(@PathVariable Long ticketId) {
         log.info("Generating hourly bill for ticket ID: {}", ticketId);
-        Bill bill = billingService.generateBill(ticketId);
+        Bill bill = billingService.generateBill(ticketId, PricingMode.HOURLY);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -54,7 +58,7 @@ public class BillingController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> generateBillSlab(@PathVariable Long ticketId) {
         log.info("Generating slab-based bill for ticket ID: {}", ticketId);
-        Bill bill = billingService.generateBillWithSlabPricing(ticketId);
+        Bill bill = billingService.generateBill(ticketId, PricingMode.SLAB);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -78,32 +82,24 @@ public class BillingController {
      * Get all bills for a user
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserBills(@PathVariable Long userId) {
+    public PageResponse<BillDTO> getUserBills(@PathVariable Long userId,
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
         currentUserService.checkAccess(userId);
-        List<Bill> bills = billingService.getUserBills(userId);
-        List<BillDTO> dtos = bills.stream().map(BillDTO::from).collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("count", bills.size());
-        response.put("bills", dtos);
-        return ResponseEntity.ok(response);
+        return PageResponse.of(billingService.getUserBills(userId, Pagination.of(page, size, NEWEST_FIRST)),
+                BillDTO::from);
     }
 
     /**
      * Get pending bills for a user
      */
     @GetMapping("/user/{userId}/pending")
-    public ResponseEntity<?> getUserPendingBills(@PathVariable Long userId) {
+    public PageResponse<BillDTO> getUserPendingBills(@PathVariable Long userId,
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
         currentUserService.checkAccess(userId);
-        List<Bill> pendingBills = billingService.getUserPendingBills(userId);
-        List<BillDTO> dtos = pendingBills.stream().map(BillDTO::from).collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("pendingCount", pendingBills.size());
-        response.put("bills", dtos);
-        return ResponseEntity.ok(response);
+        return PageResponse.of(billingService.getUserPendingBills(userId, Pagination.of(page, size, NEWEST_FIRST)),
+                BillDTO::from);
     }
 
     /**
@@ -146,15 +142,11 @@ public class BillingController {
      */
     @GetMapping("/pending-all")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllPendingBills() {
-        List<Bill> pendingBills = billingService.getAllPendingBills();
-        List<BillDTO> dtos = pendingBills.stream().map(BillDTO::from).collect(Collectors.toList());
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("totalPending", pendingBills.size());
-        response.put("bills", dtos);
-        return ResponseEntity.ok(response);
+    public PageResponse<BillDTO> getAllPendingBills(
+            @RequestParam(defaultValue = Pagination.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = Pagination.DEFAULT_SIZE) int size) {
+        return PageResponse.of(billingService.getAllPendingBills(Pagination.of(page, size, NEWEST_FIRST)),
+                BillDTO::from);
     }
 
     /**

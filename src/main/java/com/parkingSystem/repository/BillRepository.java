@@ -1,5 +1,7 @@
 package com.parkingSystem.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.parkingSystem.model.Bill;
 import com.parkingSystem.enums.BillingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -50,5 +52,16 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     boolean existsByParkingTicketTicketId(Long ticketId);
 
     Optional<Bill> findByParkingTicketTicketId(Long ticketId);
-}
 
+    // ---- paginated (step 6)
+
+    Page<Bill> findByUserUserId(Long userId, Pageable pageable);
+
+    Page<Bill> findByUserUserIdAndStatus(Long userId, BillingStatus status, Pageable pageable);
+
+    Page<Bill> findByStatus(BillingStatus status, Pageable pageable);
+
+    /** Sum of the totals of all bills with the given status, computed by the database (0 when there are none). */
+    @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Bill b WHERE b.status = :status")
+    java.math.BigDecimal sumTotalAmountByStatus(@Param("status") BillingStatus status);
+}

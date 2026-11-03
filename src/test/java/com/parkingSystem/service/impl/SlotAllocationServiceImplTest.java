@@ -1,7 +1,9 @@
 package com.parkingSystem.service.impl;
 
+import com.parkingSystem.dto.AvailabilitySummaryDTO;
 import com.parkingSystem.enums.SlotType;
 import com.parkingSystem.enums.SpaceStatus;
+import com.parkingSystem.enums.VehicleType;
 import com.parkingSystem.model.ParkingSpace;
 import com.parkingSystem.repository.ParkingSpaceRepository;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,18 +65,57 @@ class SlotAllocationServiceImplTest {
     }
 
     @Test
-    void availabilitySummaryCountsByType() {
-        when(parkingSpaceRepository.countAllAvailable()).thenReturn(6L);
-        when(parkingSpaceRepository.countAvailableBySlotType(SlotType.NORMAL)).thenReturn(3L);
-        when(parkingSpaceRepository.countAvailableBySlotType(SlotType.VIP)).thenReturn(2L);
-        when(parkingSpaceRepository.countAvailableBySlotType(SlotType.HANDICAPPED)).thenReturn(1L);
+    void availabilitySummaryListsEverySlotTypeWithZeroWhereNoneAreFree() {
+        when(parkingSpaceRepository.countAvailableGroupedBySlotType()).thenReturn(List.of(
+                new Object[] { SlotType.NORMAL, 3L },
+                new Object[] { SlotType.EV_CHARGING, 2L }));
 
-        SlotAllocationServiceImpl.AvailabilitySummary summary = slotAllocationService.getAvailabilitySummary();
+        AvailabilitySummaryDTO summary = slotAllocationService.getAvailabilitySummary();
 
-        assertThat(summary.getTotalAvailableSlots()).isEqualTo(6L);
-        assertThat(summary.getNormalSlotsAvailable()).isEqualTo(3L);
-        assertThat(summary.getVipSlotsAvailable()).isEqualTo(2L);
-        assertThat(summary.getHandicappedSlotsAvailable()).isEqualTo(1L);
+        assertThat(summary.totalAvailable()).isEqualTo(5L);
+        assertThat(summary.availableBySlotType()).containsExactly(
+                entry(SlotType.NORMAL, 3L), entry(SlotType.VIP, 0L), entry(SlotType.HANDICAPPED, 0L),
+                entry(SlotType.EV_CHARGING, 2L), entry(SlotType.BIKE, 0L));
+    }
+
+    @Test
+    void evIsOfferedAChargingBayFirstThenANormalOne() {
+        ParkingSpace charger = space(7L, "E-1", 0, "available");
+        charger.setSlotType(SlotType.EV_CHARGING);
+        ParkingSpace normal = space(8L, "N-1", 0, "available");
+        when(parkingSpaceRepository.findNearestAvailableSlot("North", SlotType.EV_CHARGING))
+                .thenReturn(Optional.of(charger));
+
+        assertThat(slotAllocationService.recommendSlot("North", VehicleType.EV)).contains(charger);
+
+        when(parkingSpaceRepository.findNearestAvailableSlot("North", SlotType.EV_CHARGING)).thenReturn(Optional.empty());
+        when(parkingSpaceRepository.findNearestAvailableSlot("North", SlotType.NORMAL)).thenReturn(Optional.of(normal));
+
+        assertThat(slotAllocationService.recommendSlot("North", VehicleType.EV)).contains(normal);
+    }
+
+    @Test
+    void bikeIsOnlyOfferedABikeBay() {
+        when(parkingSpaceRepository.findNearestAvailableSlot("North", SlotType.BIKE)).thenReturn(Optional.empty());
+
+        assertThat(slotAllocationService.recommendSlot("North", VehicleType.BIKE)).isEmpty();
+        verify(parkingSpaceRepository, never()).findNearestAvailableSlot("North", SlotType.NORMAL);
+    }
+
+    @Test
+    void slotTypesAcceptOnlyVehiclesThatFit() {
+        assertThat(SlotType.NORMAL.accepts(VehicleType.CAR)).isTrue();
+        assertThat(SlotType.NORMAL.accepts(VehicleType.EV)).isTrue();
+        assertThat(SlotType.NORMAL.accepts(VehicleType.BIKE)).isFalse();
+        assertThat(SlotType.EV_CHARGING.accepts(VehicleType.EV)).isTrue();
+        assertThat(SlotType.EV_CHARGING.accepts(VehicleType.CAR)).isFalse();
+        assertThat(SlotType.BIKE.accepts(VehicleType.BIKE)).isTrue();
+        assertThat(SlotType.BIKE.accepts(VehicleType.CAR)).isFalse();
+        assertThat(SlotType.VIP.accepts(VehicleType.CAR)).isTrue();
+        assertThat(SlotType.HANDICAPPED.accepts(null)).isFalse();
+        for (VehicleType vehicle : VehicleType.values()) {
+            assertThat(vehicle.recommendedSlotTypes()).allMatch(slot -> slot.accepts(vehicle));
+        }
     }
 
     private static ParkingSpace space(Long id, String number, Integer floor, String status) {

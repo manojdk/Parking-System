@@ -1,5 +1,7 @@
 package com.parkingSystem.service.impl;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.enums.SpaceStatus;
 import com.parkingSystem.enums.TicketStatus;
 import com.parkingSystem.exception.BadRequestException;
@@ -53,6 +55,7 @@ public class ParkingEntryExitServiceImpl implements IParkingEntryExitService {
     /**
      * Record vehicle entry into parking.
      * <p>
+     * The vehicle must fit the space's slot type (bikes in bike bays, only EVs in charging bays).
      * An AVAILABLE space takes any driver. A RESERVED space only takes the driver who holds the
      * reservation, which is then marked FULFILLED and linked to the new ticket. If the hold has already run
      * out (the expiry job may not have run yet) the reservation is expired here and the space is treated as
@@ -79,6 +82,10 @@ public class ParkingEntryExitServiceImpl implements IParkingEntryExitService {
         }
         if (!Boolean.TRUE.equals(parkingSpace.getIsActive())) {
             throw new BadRequestException("Parking space is not in service");
+        }
+        if (!parkingSpace.getSlotType().accepts(vehicle.getVehicleType())) {
+            throw new BadRequestException("A " + vehicle.getVehicleType() + " cannot park in a "
+                    + parkingSpace.getSlotType() + " space");
         }
 
         LocalDateTime now = now();
@@ -198,17 +205,17 @@ public class ParkingEntryExitServiceImpl implements IParkingEntryExitService {
     /**
      * Get all active tickets (vehicles currently parked)
      */
-    public List<ParkingTicket> getActiveTickets() {
+    public Page<ParkingTicket> getActiveTickets(Pageable pageable) {
         log.info("Fetching all active parking tickets");
-        return parkingTicketRepository.findByStatusAndExitTimeIsNull(TicketStatus.ACTIVE);
+        return parkingTicketRepository.findByStatusAndExitTimeIsNull(TicketStatus.ACTIVE, pageable);
     }
 
     /**
      * Get user's parking history
      */
-    public List<ParkingTicket> getUserParkingHistory(Long userId) {
+    public Page<ParkingTicket> getUserParkingHistory(Long userId, Pageable pageable) {
         log.info("Fetching parking history for user ID: {}", userId);
-        return parkingTicketRepository.findByUserIdAndStatus(userId, TicketStatus.CLOSED);
+        return parkingTicketRepository.findByUserUserIdAndStatus(userId, TicketStatus.CLOSED, pageable);
     }
 
     /**

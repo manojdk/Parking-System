@@ -1,5 +1,7 @@
 package com.parkingSystem.service.impl;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import com.parkingSystem.enums.VehicleType;
 import com.parkingSystem.exception.ConflictException;
 import com.parkingSystem.exception.ResourceNotFoundException;
@@ -14,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -67,9 +68,9 @@ public class VehicleServiceImpl implements IVehicleService {
     }
 
     @Override
-    public List<Vehicle> getUserVehicles(Long userId) {
+    public Page<Vehicle> getUserVehicles(Long userId, Pageable pageable) {
         log.info("Fetching all vehicles for user ID: {}", userId);
-        return vehicleRepository.findByUserUserId(userId);
+        return vehicleRepository.findByUserUserId(userId, pageable);
     }
 
     @Override
@@ -102,8 +103,8 @@ public class VehicleServiceImpl implements IVehicleService {
     }
 
     @Override
-    public List<Vehicle> getAllActiveVehicles() {
+    public Page<Vehicle> getAllActiveVehicles(Pageable pageable) {
         log.info("Fetching all active vehicles");
-        return vehicleRepository.findByIsActiveTrue();
+        return vehicleRepository.findByIsActiveTrue(pageable);
     }
 }
